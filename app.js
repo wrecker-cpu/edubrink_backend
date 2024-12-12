@@ -5,7 +5,7 @@ const cors = require("cors");
 require("dotenv").config(); // Ensure environment variables are loaded
 
 const app = express();
-const PORT = process.env.PORT || 4000; // Use environment variable for port
+const PORT = process.env.PORT || 4000; 
 
 app.use(compression());
 app.use(express.json());
