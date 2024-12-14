@@ -10,10 +10,8 @@ const createUser = async (req, res) => {
       Email: req.body.Email,
       Password: encrypt.generatePassword(req.body.Password), // Ensure async if possible
       MobileNumber: req.body.MobileNumber,
-      Coupons: ["67497c0f3600417c0e450d7d"],
       FullName: "",
       DateOfBirth: "",
-      status: req.body.status,
       isAdmin: "false",
       passwordChangedAt: Date.now(),
     };
@@ -34,7 +32,7 @@ const createUser = async (req, res) => {
 // Get all users
 const getAllUser = async (req, res) => {
   try {
-    const user = await userModel.find({ status: true }).lean(); // Use .lean() for faster query
+    const user = await userModel.find().lean(); // Use .lean() for faster query
     res.status(200).json({ data: user, message: "Users fetched successfully" });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -64,7 +62,6 @@ const getUserbyID = async (req, res) => {
     const user = await userModel
       .findById(id)
       .lean()
-      .populate("WishListCountries WishListStates Coupons"); // Use .lean() for faster query
     if (user) {
       res
         .status(200)
@@ -109,13 +106,13 @@ const deleteUser = async (req, res) => {
 
 // User login
 const loginUser = async (req, res) => {
-  const { Email, Password, MobileNumber } = req.body;
+  const { Email, Password } = req.body;
   let user;
 
   try {
     // Single query with $or for Email and MobileNumber to avoid multiple MongoDB calls
     user = await userModel
-      .findOne({ $or: [{ Email: Email }, { MobileNumber: MobileNumber }] })
+      .findOne({ Email: Email } )
       .lean(); // Use .lean() to improve query performance
 
     if (user) {
@@ -129,7 +126,7 @@ const loginUser = async (req, res) => {
         res.status(400).json({ message: "Invalid password" });
       }
     } else {
-      res.status(404).json({ message: "Email or Mobile Number not found" });
+      res.status(404).json({ message: "Email Not found" });
     }
   } catch (error) {
     res.status(500).json({ message: error.message });

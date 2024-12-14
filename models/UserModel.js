@@ -7,10 +7,6 @@ const userSchema = new Schema({
   MobileNumber: { type: String },
   FullName: { type: String },
   DateOfBirth: { type: Date },
-  status: {
-    type: Boolean,
-    default: true,
-  },
   isAdmin: {
     type: Boolean,
     default: false,
@@ -20,24 +16,9 @@ const userSchema = new Schema({
     default: null,
   },
   Address: { type: String },
-  Coupons: [{ type: Schema.Types.ObjectId, ref: 'Coupon' }],
   MaritalStatus: { type: String, enum: ["Married", "Not-Married"] },
   Gender: { type: String, enum: ["Male", "Female", "Non-Binary"] },
-  PinCode: { type: String },
-  WishListCountries: [{ type: Schema.Types.ObjectId, ref: "Country" }],
-  WishListStates: [{ type: Schema.Types.ObjectId, ref: "State" }],
-  ExtraTravellers: [
-    {
-      TravellersName: { type: String },
-      TravellersEmail: { type: String },
-      TravellersAge: { type: String },
-      TravellersNumber: { type: String },
-      TravellersDateOfBirth: { type: Date },
-      TravellersPassportNumber: { type: String },
-      TravellersPassportIssuedCountry: { type: String },
-      TravellersPassportDateOfExpiry: { type: String },
-    },
-  ],
+  ProfilePicture: { type: String },
 });
 userSchema.methods.changedPassword = function (jwtIat) {
   if (this.passwordChangedAt) {
