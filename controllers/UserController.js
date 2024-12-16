@@ -1,24 +1,64 @@
 const userModel = require("../models/UserModel");
 const encrypt = require("../utils/Encrypt");
 const auth = require("../auth/AuthValidation");
+const bcrypt = require("bcrypt");
+const userOTPVerification = require("../models/UserVerificationModel");
+const nodemailer = require("nodemailer");
+const UserModel = require("../models/UserModel");
 require("dotenv").config();
+
+let transporter = nodemailer.createTransport({
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false,
+  auth: {
+    user: process.env.AUTH_EMAIL,
+    pass: process.env.AUTH_PASS,
+  },
+});
 
 // Create user
 const createUser = async (req, res) => {
   try {
+    const existingUser = await userModel.findOne({ Email: req.body.Email });
+
+    if (existingUser) {
+      // If the user already exists, send a response indicating the email is already registered
+      return res
+        .status(400)
+        .json({ message: "User with this email already exists" });
+    }
     const user = {
       Email: req.body.Email,
       Password: encrypt.generatePassword(req.body.Password), // Ensure async if possible
-      MobileNumber: req.body.MobileNumber,
       FullName: "",
       DateOfBirth: "",
-      isAdmin: "false",
+      isAdmin: false,
       passwordChangedAt: Date.now(),
+      verified: false,
     };
 
+    // Create the user in the database
     const savedUser = await userModel.create(user);
     if (savedUser) {
-      auth.createSendToken(savedUser, 201, res);
+      // Wait for OTP verification email to be sent before proceeding
+      const otpStatus = await sendOtpVerificationEmail({
+        id: savedUser._id,
+        email: savedUser.Email,
+      });
+
+      if (otpStatus.status === "pending") {
+        res.status(200).json({
+          message: "User created successfully. OTP sent for verification.",
+          data: otpStatus,
+        });
+      } else {
+        // OTP email failed
+        res.status(500).json({
+          message: "User created, but failed to send OTP.",
+          error: otpStatus.message,
+        });
+      }
     } else {
       res.status(400).json({ message: "Incomplete User Details" });
     }
@@ -26,6 +66,110 @@ const createUser = async (req, res) => {
     res
       .status(500)
       .json({ message: "Error in creating", error: error.message });
+  }
+};
+
+const verifyOtp = async (req, res) => {
+  try {
+    let { userId, otp } = req.body;
+    if (!userId || !otp) {
+      throw new Error("Empty Fields");
+    } else {
+      const userOTPVerificationRecords = await userOTPVerification.find({
+        userId,
+      });
+      if (userOTPVerificationRecords.length <= 0) {
+        throw new Error("User OTP Verification Record Not Found");
+      } else {
+        const { expiresAt } = userOTPVerificationRecords[0];
+        const hashedOTP = userOTPVerificationRecords[0].otp;
+        if (expiresAt < Date.now()) {
+          await userOTPVerification.deleteMany({ userId });
+          throw new Error("OTP Expired");
+        } else {
+          const validOtp = await bcrypt.compare(otp, hashedOTP);
+          if (!validOtp) {
+            throw new Error("Invalid code passed. Check your inbox.");
+          } else {
+            await userModel.updateOne({ _id: userId }, { verified: true });
+            await userOTPVerification.deleteMany({ userId });
+            const verifiedUser = await userModel.findById(userId); // Await the result
+            auth.createSendToken(verifiedUser, 200, res); // Send token if OTP is verified
+
+            // Remove the redundant response here
+            return; // Make sure nothing else is sent after this point
+          }
+        }
+      }
+    }
+  } catch (error) {
+    res.status(500).json({
+      message: "Error in verifying OTP",
+      error: error.message,
+    });
+  }
+};
+
+const resendOtp = async (req, res) => {
+  try {
+    let { userId, email } = req.body;
+    if (!userId || !email) {
+      throw Error("Empty Fields");
+    } else {
+      await userOTPVerification.deleteMany({ userId });
+      sendOtpVerficationEmail({ id: userId, email: email }, res);
+    }
+  } catch (error) {
+    res.status(500).json({
+      message: "Error in sending OTP",
+      error: error.message,
+    });
+  }
+};
+
+const sendOtpVerificationEmail = async ({ id, email }) => {
+  try {
+    const otp = `${Math.floor(1000 + Math.random() * 9000)}`;
+
+    // Mail Options to send OTP to the user's email
+    const mailOptions = {
+      from: process.env.AUTH_EMAIL,
+      to: email,
+      subject: "OTP Verification",
+      html: `<p>Your OTP is <b>${otp}</b></p>`,
+    };
+
+    // Salt rounds for bcrypt hashing
+    const saltRounds = 10;
+
+    // Hash the OTP before saving it to the database
+    const hashedOtp = await bcrypt.hash(otp, saltRounds);
+
+    // Create a new OTP verification document
+    const newOtpVerification = new userOTPVerification({
+      userId: id,
+      otp: hashedOtp,
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 5 * 60 * 1000, // OTP expires in 5 minutes
+    });
+
+    // Save OTP verification in the database
+    await newOtpVerification.save();
+
+    // Send the OTP email
+    await transporter.sendMail(mailOptions);
+
+    // Return success status
+    return {
+      status: "pending",
+      message: "OTP sent successfully. Awaiting verification.",
+      data: { userId: id, email },
+    };
+  } catch (error) {
+    return {
+      status: "error",
+      message: error.message,
+    };
   }
 };
 
@@ -59,9 +203,7 @@ const updateAllUsers = async (req, res) => {
 const getUserbyID = async (req, res) => {
   try {
     const id = req.params.id;
-    const user = await userModel
-      .findById(id)
-      .lean()
+    const user = await userModel.findById(id).lean();
     if (user) {
       res
         .status(200)
@@ -111,9 +253,7 @@ const loginUser = async (req, res) => {
 
   try {
     // Single query with $or for Email and MobileNumber to avoid multiple MongoDB calls
-    user = await userModel
-      .findOne({ Email: Email } )
-      .lean(); // Use .lean() to improve query performance
+    user = await userModel.findOne({ Email: Email }).lean(); // Use .lean() to improve query performance
 
     if (user) {
       const isPasswordValid = await encrypt.comparePassword(
@@ -141,4 +281,6 @@ module.exports = {
   getUserbyID,
   deleteUser,
   loginUser,
+  verifyOtp,
+  resendOtp,
 };

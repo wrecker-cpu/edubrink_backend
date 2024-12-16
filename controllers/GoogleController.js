@@ -20,9 +20,10 @@ const googleLogin = async (req, res) => {
       user = await userModel.create({
         Email: email,
         passwordChangedAt: Date.now(),
-        FullName: "",
+        FullName: name,
         DateOfBirth: "",
         MobileNumber: "",
+        verified: true,
       });
       auth.createSendToken(user, 201, res);
     } else {
