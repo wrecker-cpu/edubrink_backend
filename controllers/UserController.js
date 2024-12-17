@@ -117,7 +117,7 @@ const resendOtp = async (req, res) => {
       throw Error("Empty Fields");
     } else {
       await userOTPVerification.deleteMany({ userId });
-      sendOtpVerficationEmail({ id: userId, email: email }, res);
+      sendOtpVerificationEmail({ id: userId, email: email }, res);
     }
   } catch (error) {
     res.status(500).json({
@@ -261,7 +261,26 @@ const loginUser = async (req, res) => {
         user.Password
       );
       if (isPasswordValid) {
-        auth.createSendToken(user, 200, res); // Send token if password matches
+        if (user.verified !== true) {
+          const otpStatus = await sendOtpVerificationEmail({
+            id: user._id,
+            email: user.Email,
+          });
+          if (otpStatus.status === "pending") {
+            res.status(200).json({
+              message: "User created successfully. OTP sent for verification.",
+              data: otpStatus,
+            });
+          } else {
+            // OTP email failed
+            res.status(500).json({
+              message: "User created, but failed to send OTP.",
+              error: otpStatus.message,
+            });
+          }
+        } else {
+          auth.createSendToken(user, 200, res); // Send token if password matches
+        }
       } else {
         res.status(400).json({ message: "Invalid password" });
       }
