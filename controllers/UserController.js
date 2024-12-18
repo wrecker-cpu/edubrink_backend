@@ -4,7 +4,6 @@ const auth = require("../auth/AuthValidation");
 const bcrypt = require("bcrypt");
 const userOTPVerification = require("../models/UserVerificationModel");
 const nodemailer = require("nodemailer");
-const UserModel = require("../models/UserModel");
 require("dotenv").config();
 
 let transporter = nodemailer.createTransport({
