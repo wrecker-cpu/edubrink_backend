@@ -7,10 +7,12 @@ const univeristySchema = new Schema({
     ar: { type: String, required: true }, // Arabic name
   },
   uniSymbol: { type: String, required: true },
-  courseId: {
-    type: Schema.Types.ObjectId,
-    ref: "Course", // Reference to the Course model
-  },
+  courseId: [
+    {
+      type: Schema.Types.ObjectId,
+      ref: "Course", // Reference to the Course model
+    },
+  ],
   scholarshipAvailability: {
     type: Boolean,
   },
