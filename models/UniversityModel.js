@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 const Schema = mongoose.Schema; // Creation of the Schema class
 
-const univeristySchema = new Schema({
+const universitySchema = new Schema({
   uniName: {
     en: { type: String, required: true }, // English name
     ar: { type: String, required: true }, // Arabic name
@@ -81,4 +81,4 @@ const univeristySchema = new Schema({
   },
 });
 
-module.exports = mongoose.model("University", univeristySchema); // Exporting the model
+module.exports = mongoose.model("University", universitySchema); // Exporting the model

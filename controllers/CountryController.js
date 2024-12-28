@@ -41,6 +41,24 @@ const getAllCountries = async (req, res) => {
   }
 };
 
+const getCountryByName = async (req, res) => {
+  const name = req.params.name; // Assume 'name' is passed as a route parameter
+  try {
+    // Find the country by name
+    const countryData = await countryModel
+      .findOne({ "countryName.en": name })
+      .populate("universities")
+      .lean();
+
+    if (!countryData) {
+      return res.status(404).json({ message: "Country not found" });
+    }
+    res.status(200).json({ data: countryData });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 // Update a country by ID
 const updateCountry = async (req, res) => {
   const id = req.params.id;
@@ -79,4 +97,5 @@ module.exports = {
   getAllCountries,
   updateCountry,
   deleteCountry,
+  getCountryByName,
 };
