@@ -34,7 +34,10 @@ const getCountryById = async (req, res) => {
 // Read (Get) all countries
 const getAllCountries = async (req, res) => {
   try {
-    const countries = await countryModel.find().lean();
+    const countries = await countryModel.find().populate({
+      path: 'universities',
+      select: 'uniName uniLocation', // Select only the fields you want to populate
+    }).lean();
     res.status(200).json({ data: countries });
   } catch (err) {
     res.status(500).json({ message: err.message });
