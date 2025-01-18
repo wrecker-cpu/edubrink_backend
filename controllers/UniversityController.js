@@ -5,9 +5,10 @@ const createUniversity = async (req, res) => {
   try {
     const universityData = new universityModel(req.body);
     await universityData.save();
-    res
-      .status(201)
-      .json({ data: universityData, message: "University created successfully" });
+    res.status(201).json({
+      data: universityData,
+      message: "University created successfully",
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -30,7 +31,13 @@ const getUniversityById = async (req, res) => {
 // Read (Get) all Universities
 const getAllUniversities = async (req, res) => {
   try {
-    const universities = await universityModel.find().lean();
+    const universities = await universityModel
+      .find()
+      .populate([{
+        path: "courseId",
+        match: { _id: { $exists: true } }, // Only populate if courseId exists
+      }])
+      .lean();
     res.status(200).json({ data: universities });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -47,9 +54,10 @@ const updateUniversity = async (req, res) => {
     if (!universityData) {
       return res.status(404).json({ message: "University not found" });
     }
-    res
-      .status(200)
-      .json({ data: universityData, message: "University updated successfully" });
+    res.status(200).json({
+      data: universityData,
+      message: "University updated successfully",
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

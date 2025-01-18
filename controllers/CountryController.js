@@ -58,7 +58,19 @@ const getCountryByName = async (req, res) => {
     // Find the country by name
     const countryData = await countryModel
       .findOne({ "countryName.en": name })
-      .populate("universities")
+      .populate({
+        path: "universities",
+        populate: {
+          path: "courseId",
+          model: "Course",
+          match: { _id: { $ne: null } }, // Ensures only non-null IDs are used
+          select: "CourseName DeadLine CourseFees", // Include only specific fields
+        },
+      })
+      .populate({
+        path: "blog",
+        select: "blogTitle blogSubtitle blogAdded",
+      })
       .lean();
 
     if (!countryData) {
