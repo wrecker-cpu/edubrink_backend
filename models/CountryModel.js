@@ -28,6 +28,12 @@ const countrySchema = new Schema({
       ref: "University", // Reference to the University model
     },
   ],
+  blog: [
+    {
+      type: Schema.Types.ObjectId,
+      ref: "Blog",
+    },
+  ],
 });
 
 module.exports = mongoose.model("Country", countrySchema); // Exporting the model

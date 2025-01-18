@@ -20,7 +20,7 @@ const getCountryById = async (req, res) => {
     // Find the country and populate the 'universities' field
     const countryData = await countryModel
       .findById(id)
-      .populate("universities")
+      .populate("universities blog")
       .lean();
     if (!countryData) {
       return res.status(404).json({ message: "Country not found" });
@@ -34,10 +34,18 @@ const getCountryById = async (req, res) => {
 // Read (Get) all countries
 const getAllCountries = async (req, res) => {
   try {
-    const countries = await countryModel.find().populate({
-      path: 'universities',
-      select: 'uniName uniLocation', // Select only the fields you want to populate
-    }).lean();
+    const countries = await countryModel
+      .find()
+      .populate([
+        {
+          path: "universities",
+          select: "uniName uniLocation", // Select fields for the universities
+        },
+        {
+          path: "blog",
+        },
+      ])
+      .lean();
     res.status(200).json({ data: countries });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -59,6 +67,22 @@ const getCountryByName = async (req, res) => {
     res.status(200).json({ data: countryData });
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+};
+
+const updateAllCountries = async (req, res) => {
+  try {
+    const updateCountry = req.body;
+    const result = await countryModel.updateMany({}, updateCountry);
+
+    res.status(200).json({
+      message: "Country updated successfully",
+      modifiedCount: result.modifiedCount,
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error updating users", error: error.message });
   }
 };
 
@@ -98,6 +122,7 @@ module.exports = {
   createCountry,
   getCountryById,
   getAllCountries,
+  updateAllCountries,
   updateCountry,
   deleteCountry,
   getCountryByName,

@@ -15,6 +15,7 @@ const universityRoutes = require("../routes/UniversityRoutes");
 const googleRoutes = require("../routes/GoogleRoutes");
 const countryRoutes = require("../routes/CountryRoutes");
 const courseRoutes = require("../routes/CourseRoutes");
+const blogRoutes = require("../routes/BlogRoutes");
 
 app.get("/", (req, res) => {
   res.send("API is running...");
@@ -26,6 +27,7 @@ app.use("/api/university", universityRoutes);
 app.use("/api/country", countryRoutes);
 app.use("/api/course", courseRoutes);
 app.use("/api/google", googleRoutes);
+app.use("/api/blog", blogRoutes);
 
 // DATABASE CONNECTION
 const connectDB = async (retries = 5) => {
