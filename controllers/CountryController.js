@@ -36,15 +36,20 @@ const getAllCountries = async (req, res) => {
   try {
     const countries = await countryModel
       .find()
-      .populate([
-        {
-          path: "universities",
-          select: "uniName uniLocation", // Select fields for the universities
+      .populate({
+        path: "universities",
+        select: "courseId uniName scholarshipAvailability uniTutionFees",
+        populate: {
+          path: "courseId",
+          model: "Course",
+          match: { _id: { $ne: null } }, // Ensures only non-null IDs are used
+          select: "CourseName DeadLine CourseFees", // Include only specific fields
         },
-        {
-          path: "blog",
-        },
-      ])
+      })
+      .populate({
+        path: "blog",
+        select: "blogTitle blogSubtitle blogAdded",
+      })
       .lean();
     res.status(200).json({ data: countries });
   } catch (err) {
@@ -60,6 +65,7 @@ const getCountryByName = async (req, res) => {
       .findOne({ "countryName.en": name })
       .populate({
         path: "universities",
+        select: "courseId uniName scholarshipAvailability uniTutionFees",
         populate: {
           path: "courseId",
           model: "Course",

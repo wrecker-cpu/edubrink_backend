@@ -34,11 +34,37 @@ const getBlogById = async (req, res) => {
 // Read (Get) all blog
 const getAllBlog = async (req, res) => {
   try {
-    const blog = await blogModel
-      .find()
+    const blogs = await blogModel.aggregate([
+      {
+        $lookup: {
+          from: "countries", // Name of the Country collection
+          localField: "_id", // Field in Blog schema to match
+          foreignField: "blog", // Field in Country schema to match
+          as: "countries", // Output array name
+        },
+      },
+      {
+        $unwind: {
+          path: "$countries",
+          preserveNullAndEmptyArrays: true, // Keep blogs without associated countries
+        },
+      },
+      {
+        $project: {
+          blogTitle: 1,
+          blogSubtitle: 1,
+          blogDescription: 1,
+          blogAdded: 1,
+          blogPhoto: 1,
+          blogRelated: 1,
+          countryName: "$countries.countryName", // Include countryName
+          countryPopulation: "$countries.countryStudentPopulation", // Include student population
+          countryCurrency: "$countries.countryCurrency", // Include currency
+        },
+      },
+    ]);
 
-      .lean();
-    res.status(200).json({ data: blog });
+    res.status(200).json({ data: blogs });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
