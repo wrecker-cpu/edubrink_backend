@@ -97,23 +97,40 @@ const getAllCoursesWithUniNames = async (req, res) => {
   try {
     // Dynamically get `page` and `limit` from query parameters
     const page = parseInt(req.query.page) || 1; // Default to page 1 if not provided
-    const limit = parseInt(req.query.limit) || 5; // Default to 10 items per page
+    const limit = parseInt(req.query.limit) || 5; // Default to 5 items per page
 
     const courses = await courseModel.aggregate([
+      // Step 1: Lookup the university information
       {
         $lookup: {
-          from: "universities", // Name of the University collection
-          localField: "_id", // Field in Course to match
-          foreignField: "courseId", // Field in University to match
-          as: "university", // Output array
+          from: "universities", // University collection
+          localField: "_id", // Match on _id in courseModel
+          foreignField: "courseId", // Reference field in university model
+          as: "university", // The result will be stored in the "university" field
         },
       },
       {
         $unwind: {
-          path: "$university",
-          preserveNullAndEmptyArrays: true, // Keep courses without a university
+          path: "$university", // Unwind to flatten the university data
+          preserveNullAndEmptyArrays: true, // Keep courses without university
         },
       },
+      // Step 2: Lookup the country information via the country's universities field
+      {
+        $lookup: {
+          from: "countries", // Country collection
+          localField: "university._id", // Use university._id (the ID of the university)
+          foreignField: "universities", // Match with universities field in country schema
+          as: "country", // The result will be stored in the "country" field
+        },
+      },
+      {
+        $unwind: {
+          path: "$country", // Unwind to flatten the country data
+          preserveNullAndEmptyArrays: true, // Keep university data even if no country
+        },
+      },
+      // Step 3: Project the desired fields
       {
         $project: {
           CourseName: 1,
@@ -123,10 +140,13 @@ const getAllCoursesWithUniNames = async (req, res) => {
           CourseFees: 1,
           ModeOfStudy: 1,
           Requirements: 1,
-          uniName: "$university.uniName", // Extract uniName
+          uniName: "$university.uniName", // Extract university name
           uniSymbol: "$university.uniSymbol", // Extract university symbol
+          countryNameEn: "$country.countryName.en", // Extract English country name
+          countryNameAr: "$country.countryName.ar", // Extract Arabic country name
         },
       },
+      // Step 4: Skip and Limit for Pagination
       {
         $skip: (page - 1) * limit, // Skip documents for previous pages
       },
@@ -152,6 +172,7 @@ const getAllCoursesWithUniNames = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
 
 // const getcourseByName = async (req, res) => {
 //   const name = req.params.name; // Assume 'name' is passed as a route parameter
