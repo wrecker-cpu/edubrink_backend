@@ -25,6 +25,12 @@ const universitySchema = new Schema({
     type: String,
     enum: ["public", "private"],
   },
+  inTakeMonth: {
+    type: String,
+  },
+  inTakeYear: {
+    type: Number,
+  },
   entranceExamRequired: {
     type: Boolean,
   },

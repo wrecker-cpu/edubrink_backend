@@ -1,4 +1,6 @@
+const NodeCache = require("node-cache");
 const countryModel = require("../models/CountryModel");
+const cache = new NodeCache({ stdTTL: 600, checkperiod: 60 });
 
 // Create a new country
 const createCountry = async (req, res) => {
@@ -88,6 +90,110 @@ const getCountryByName = async (req, res) => {
   }
 };
 
+const getFullDepthData = async (req, res) => {
+  // const cacheKey = "fullDepthData"; // Cache key to identify the stored data
+
+  // // Check if the data is already in the cache
+  // const cachedData = cache.get(cacheKey);
+  // if (cachedData) {
+  //   return res.status(200).json(cachedData); // Return the cached data
+  // }
+
+  try {
+    const result = await countryModel.aggregate([
+      {
+        $lookup: {
+          from: "universities", // Lookup universities based on IDs in the universities array
+          localField: "universities",
+          foreignField: "_id",
+          as: "universities",
+        },
+      },
+      {
+        $unwind: {
+          path: "$universities",
+          preserveNullAndEmptyArrays: true, // Preserve countries without universities
+        },
+      },
+      {
+        $lookup: {
+          from: "courses", // Lookup courses based on IDs in the courseId array
+          localField: "universities.courseId",
+          foreignField: "_id",
+          as: "universities.courseId",
+        },
+      },
+      {
+        $group: {
+          _id: "$_id", // Group back by country
+          countryName: { $first: "$countryName" },
+          countryCode: { $first: "$countryCode" },
+          countryStudentPopulation: { $first: "$countryStudentPopulation" },
+          countryCurrency: { $first: "$countryCurrency" },
+          countryLanguages: { $first: "$countryLanguages" },
+          universities: { $push: "$universities" }, // Recreate the universities array
+          blog: { $first: "$blog" }, // Include blog field for lookup
+        },
+      },
+      {
+        $lookup: {
+          from: "blogs", // Populate blogs using the blogs IDs
+          localField: "blog", // Local field in the country collection
+          foreignField: "_id", // Match with the _id in blogs collection
+          as: "blog", // Populate blog field
+        },
+      },
+      {
+        $project: {
+          countryName: 1,
+          countryCode: 1,
+          countryStudentPopulation: 1,
+          countryCurrency: 1,
+          countryLanguages: 1,
+          universities: 1,
+          blog: 1, // Fully populated blog
+          totalUniversities: { $size: "$universities" }, // Count universities
+          totalCourses: {
+            $sum: {
+              $map: {
+                input: "$universities",
+                as: "university",
+                in: { $size: { $ifNull: ["$$university.courseId", []] } }, // Count courses per university
+              },
+            },
+          },
+          totalBlogs: { $size: "$blog" }, // Count blogs
+        },
+      },
+    ]);
+
+    if (!result || result.length === 0) {
+      return res.status(404).json({ message: "No data found" });
+    }
+
+    const responseData = {
+      data: result,
+      countriesCount: result.length,
+      universitiesCount: result.reduce(
+        (acc, country) => acc + country.totalUniversities,
+        0
+      ),
+      coursesCount: result.reduce(
+        (acc, country) => acc + country.totalCourses,
+        0
+      ),
+      blogCount: result.reduce((acc, country) => acc + country.totalBlogs, 0),
+    };
+
+    // Store the response data in the cache with the cache key
+    // cache.set(cacheKey, responseData);
+
+    res.status(200).json(responseData); // Return the response
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 const updateAllCountries = async (req, res) => {
   try {
     const updateCountry = req.body;
@@ -144,4 +250,5 @@ module.exports = {
   updateCountry,
   deleteCountry,
   getCountryByName,
+  getFullDepthData,
 };

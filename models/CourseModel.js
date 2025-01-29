@@ -7,7 +7,7 @@ const courseSchema = new Schema({
   CourseDuration: { type: String },
   CourseStartDate: { type: Date },
   DeadLine: { type: Date },
-  CourseFees: { type: String },
+  CourseFees: { type: Number },
   ModeOfStudy: [{ en: { type: String }, ar: { type: String } }],
   Requirements: [{ en: { type: String }, ar: { type: String } }],
 });
