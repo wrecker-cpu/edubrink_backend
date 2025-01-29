@@ -1,5 +1,4 @@
 const courseModel = require("../models/CourseModel");
-const universityModel = require("../models/UniversityModel");
 const mongoose = require("mongoose");
 
 // Create a new course
@@ -172,7 +171,6 @@ const getAllCoursesWithUniNames = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
-
 
 // const getcourseByName = async (req, res) => {
 //   const name = req.params.name; // Assume 'name' is passed as a route parameter
