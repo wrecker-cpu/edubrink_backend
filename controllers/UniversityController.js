@@ -1,4 +1,5 @@
 const universityModel = require("../models/UniversityModel");
+const countryModel = require("../models/CountryModel");
 
 // Create a new University
 const createUniversity = async (req, res) => {
@@ -94,16 +95,77 @@ const getUniversityById = async (req, res) => {
 //     res.status(500).json({ message: err.message });
 //   }
 // };
-
 const getAllUniversities = async (req, res) => {
   try {
-    const universityData = await universityModel.find().populate("courseId");
-    if (!universityData) {
-      return res.status(404).json({ message: "University not found" });
+    // Aggregation pipeline to join universities with their countries and populate courses
+    const universityData = await universityModel.aggregate([
+      // Lookup country data by matching universities' ids in the country's universities array
+      {
+        $lookup: {
+          from: "countries", // The countries collection to join
+          localField: "_id", // The university _id
+          foreignField: "universities", // Field in country that references university _id
+          as: "country", // This will add the country data in a new array field "country"
+        },
+      },
+      {
+        $unwind: {
+          path: "$country", // Unwind the country array to get a single object instead of an array
+          preserveNullAndEmptyArrays: true, // Preserve universities without a matching country
+        },
+      },
+      {
+        $addFields: {
+          countryName: {
+            $ifNull: ["$country.countryName", ""], // Default to empty string if countryName is missing
+          },
+          countryFlag: {
+            $ifNull: ["$country.countryPhotos.countryFlag", ""], // Default to empty string if countryFlag is missing
+          },
+        },
+      },
+      // Lookup to populate the courseId field with course data
+      {
+        $lookup: {
+          from: "courses", // The courses collection to join
+          localField: "courseId", // The field in University model containing course IDs
+          foreignField: "_id", // Match with the _id in the Course collection
+          as: "courseId", // This will add the course data to the "courseId" field (instead of courses)
+        },
+      },
+      {
+        $project: {
+          // Include all university fields and additional countryName, countryFlag
+          uniName: 1, // University name
+          uniSymbol: 1, // University symbol
+          courseId: 1, // Include the full populated course data in courseId
+          scholarshipAvailability: 1,
+          spokenLanguage: 1,
+          uniType: 1,
+          inTakeMonth: 1,
+          inTakeYear: 1,
+          entranceExamRequired: 1,
+          studyLevel: 1,
+          uniLocation: 1, // Include location data
+          uniTutionFees: 1,
+          uniOverview: 1,
+          uniAccomodation: 1,
+          uniLibrary: 1,
+          uniSports: 1,
+          studentLifeStyleInUni: 1,
+          countryName: 1, // Added countryName field
+          countryFlag: 1, // Added countryFlag field from countryPhotos
+        },
+      },
+    ]);
+
+    if (!universityData || universityData.length === 0) {
+      return res.status(404).json({ message: "Universities not found" });
     }
+
     res.status(200).json({
       data: universityData,
-      message: "University updated successfully",
+      message: "Universities fetched successfully",
     });
   } catch (err) {
     res.status(500).json({ message: err.message });

@@ -1,7 +1,6 @@
 const courseModel = require("../models/CourseModel");
 const mongoose = require("mongoose");
 
-// Create a new course
 const createCourse = async (req, res) => {
   try {
     const courseData = new courseModel(req.body);
@@ -14,7 +13,6 @@ const createCourse = async (req, res) => {
   }
 };
 
-// Read (Get) a course by ID
 const getCourseById = async (req, res) => {
   const id = req.params.id;
   try {

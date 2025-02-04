@@ -10,6 +10,7 @@ const courseSchema = new Schema({
   CourseFees: { type: Number },
   ModeOfStudy: [{ en: { type: String }, ar: { type: String } }],
   Requirements: [{ en: { type: String }, ar: { type: String } }],
+  Tags: [{ type: Schema.Types.ObjectId, ref: "Tag" }]
 });
 
 module.exports = mongoose.model("Course", courseSchema); //exporting the model

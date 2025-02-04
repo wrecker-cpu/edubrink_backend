@@ -20,6 +20,8 @@ const countryRoutes = require("./routes/CountryRoutes");
 const courseRoutes = require("./routes/CourseRoutes");
 const blogRoutes = require("./routes/BlogRoutes");
 const keywordRoutes = require("./routes/KeywordRoutes");
+const analysisRoutes = require("./routes/AnalysisRoutes");
+const tagRoutes = require("./routes/TagRoutes");
 
 app.get("/", (req, res) => {
   res.send("API is running...");
@@ -33,6 +35,8 @@ app.use("/api/course", courseRoutes);
 app.use("/api/google", googleRoutes);
 app.use("/api/blog", blogRoutes);
 app.use("/api/keyword", keywordRoutes);
+app.use("/api/analysis", analysisRoutes);
+app.use("/api/tags", tagRoutes);
 
 // DATABASE CONNECTION
 const connectDB = async (retries = 5) => {
