@@ -6,6 +6,10 @@ const tagSchema = new Schema({
     en: { type: String, required: true },
     ar: { type: String, required: true },
   },
+  keywords: {
+    en: [{ type: String, required: true }],
+    ar: [{ type: String, required: true }],
+  },
 });
 
 module.exports = mongoose.model("Tag", tagSchema);

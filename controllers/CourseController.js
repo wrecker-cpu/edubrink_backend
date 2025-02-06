@@ -14,26 +14,35 @@ const createCourse = async (req, res) => {
 };
 
 const getCourseById = async (req, res) => {
-  const id = req.params.id;
+  const { id, name } = req.params; // Destructure both 'id' and 'name'
+
   try {
+    let matchCondition = {};
+
+    // Check if id is a valid ObjectId, if so, match by ID
+    if (id && mongoose.Types.ObjectId.isValid(id)) {
+      matchCondition = { _id: new mongoose.Types.ObjectId(id) }; // Match by ID
+    }
+    // If 'id' is not valid, try matching by course name
+    else if (name) {
+      matchCondition = { "CourseName.en": name }; // Match by course name (in English)
+    } else {
+      return res
+        .status(400)
+        .json({ message: "Provide either a valid ID or a course name" });
+    }
+
     const courseData = await courseModel.aggregate([
-      {
-        $match: { _id: new mongoose.Types.ObjectId(id) }, // Match the course by ID
-      },
+      { $match: matchCondition },
       {
         $lookup: {
-          from: "universities", // Name of the University collection
-          localField: "_id", // Field in Course to match
-          foreignField: "courseId", // Field in University to match
-          as: "university", // Output array
+          from: "universities",
+          localField: "_id",
+          foreignField: "courseId",
+          as: "university",
         },
       },
-      {
-        $unwind: {
-          path: "$university",
-          preserveNullAndEmptyArrays: true, // Keep courses without a university
-        },
-      },
+      { $unwind: { path: "$university", preserveNullAndEmptyArrays: true } },
       {
         $project: {
           CourseName: 1,
@@ -43,8 +52,8 @@ const getCourseById = async (req, res) => {
           CourseFees: 1,
           ModeOfStudy: 1,
           Requirements: 1,
-          uniName: "$university.uniName", // Extract university name
-          uniSymbol: "$university.uniSymbol", // Extract university symbol
+          uniName: "$university.uniName",
+          uniSymbol: "$university.uniSymbol",
         },
       },
     ]);
@@ -53,7 +62,7 @@ const getCourseById = async (req, res) => {
       return res.status(404).json({ message: "Course not found" });
     }
 
-    res.status(200).json({ data: courseData[0] }); // Send the first matching result
+    res.status(200).json({ data: courseData[0] });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -64,7 +73,7 @@ const getAllCourses = async (req, res) => {
     // Check if the `all` query parameter is set to true
     if (req.query.all === "true") {
       // Fetch all courses without limit or skip
-      const courses = await courseModel.find().lean();
+      const courses = await courseModel.find().populate("Tags").lean();
       return res.status(200).json({ data: courses });
     }
 
@@ -73,7 +82,12 @@ const getAllCourses = async (req, res) => {
     const page = parseInt(req.query.page) || 1; // Default to the first page
     const skip = (page - 1) * limit; // Calculate how many items to skip
 
-    const courses = await courseModel.find().skip(skip).limit(limit).lean();
+    const courses = await courseModel
+      .find()
+      .populate("Tags")
+      .skip(skip)
+      .limit(limit)
+      .lean();
     const totalCount = await courseModel.countDocuments();
 
     res.status(200).json({

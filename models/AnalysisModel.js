@@ -5,12 +5,16 @@ const analysisSchema = new Schema({
   itemId: {
     type: mongoose.Schema.Types.ObjectId,
     required: true,
-    refPath: "category", // Mongoose dynamically links to University, Country, or analysis
+    refPath: "category", // Dynamic reference
   },
   category: {
     type: String,
     required: true,
     enum: ["University", "Country", "Blog", "Course"],
+  },
+  country: {
+    en: { type: String },
+    ar: { type: String },
   },
   clicks: {
     type: Number,

@@ -54,7 +54,7 @@ const createAnalysisBatch = async (req, res) => {
 
     // Loop through the batch data and process each entry
     for (let data of batchData) {
-      const { itemId, category, clicks } = data;
+      const { itemId, category, clicks, country } = data;
 
       // Validate if category is valid
       const allowedCategories = ["University", "Country", "Blog", "Course"];
@@ -80,6 +80,7 @@ const createAnalysisBatch = async (req, res) => {
           category,
           clicks,
           lastClickedAt: Date.now(),
+          country: category === "Country" ? undefined : country,
         });
         await newAnalysisData.save(); // Save the new record
       }
@@ -113,7 +114,13 @@ const getAnalysisById = async (req, res) => {
 
 const getAllAnalysis = async (req, res) => {
   try {
-    const analysis = await analysisModel.find().lean();
+    const analysis = await analysisModel
+      .find()
+      .populate({
+        path: "itemId",
+        select: "CourseName uniName blogTitle countryName",
+      })
+      .lean();
 
     res.status(200).json({ data: analysis });
   } catch (err) {

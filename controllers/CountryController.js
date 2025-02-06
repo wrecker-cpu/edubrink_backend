@@ -91,14 +91,6 @@ const getCountryByName = async (req, res) => {
 };
 
 const getFullDepthData = async (req, res) => {
-  // const cacheKey = "fullDepthData"; // Cache key to identify the stored data
-
-  // // Check if the data is already in the cache
-  // const cachedData = cache.get(cacheKey);
-  // if (cachedData) {
-  //   return res.status(200).json(cachedData); // Return the cached data
-  // }
-
   try {
     const result = await countryModel.aggregate([
       {
@@ -121,6 +113,29 @@ const getFullDepthData = async (req, res) => {
           localField: "universities.courseId",
           foreignField: "_id",
           as: "universities.courseId",
+          pipeline: [
+            {
+              $lookup: {
+                from: "tags", // Assuming there's a `tags` collection that stores Tags
+                localField: "Tags", // The field that references the Tags collection
+                foreignField: "_id",
+                as: "Tags", // Populate the Tags field
+              },
+            },
+            {
+              $project: {
+                CourseName: 1,
+                CourseDescription: 1,
+                CourseDuration: 1,
+                CourseStartDate: 1,
+                DeadLine: 1,
+                CourseFees: 1,
+                ModeOfStudy: 1,
+                Requirements: 1,
+                Tags: 1, // Include Tags field from the tags lookup
+              },
+            },
+          ],
         },
       },
       {
