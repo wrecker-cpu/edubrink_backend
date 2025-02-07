@@ -29,6 +29,105 @@ const getUniversityById = async (req, res) => {
   }
 };
 
+const getUniversityByName = async (req, res) => {
+  const name = req.params.name; // Get university name from route parameters
+
+  try {
+    const universityData = await universityModel.aggregate([
+      {
+        $match: { "uniName.en": name }, // Filter universities by name
+      },
+      // Lookup country data by matching universities' ids in the country's universities array
+      {
+        $lookup: {
+          from: "countries", // The countries collection
+          localField: "_id", // The university _id
+          foreignField: "universities", // Match with university _id in Country
+          as: "country", // This will store country data in the "country" array
+        },
+      },
+      {
+        $unwind: {
+          path: "$country",
+          preserveNullAndEmptyArrays: true, // Keep universities without a country
+        },
+      },
+      {
+        $addFields: {
+          countryName: {
+            $ifNull: ["$country.countryName", ""], // Default to empty string if missing
+          },
+          countryFlag: {
+            $ifNull: ["$country.countryPhotos.countryFlag", ""],
+          },
+        },
+      },
+      // Lookup courses related to the university
+      {
+        $lookup: {
+          from: "courses", // The courses collection
+          localField: "courseId", // The field in University model containing course IDs
+          foreignField: "_id", // Match with Course _id
+          as: "courses", // Store populated courses in "courses"
+          pipeline: [
+            {
+              $lookup: {
+                from: "tags", // The tags collection
+                localField: "Tags", // Field in Course model referencing Tags
+                foreignField: "_id", // Match with _id in Tags collection
+                as: "Tags", // Populate Tags field
+              },
+            },
+            {
+              $project: {
+                CourseName: 1,
+                ModeOfStudy: 1,
+                DeadLine: 1,
+                CourseFees: 1,
+                Tags: 1, // Include populated Tags field
+              },
+            },
+          ],
+        },
+      },
+      {
+        $project: {
+          uniName: 1, // University name
+          uniSymbol: 1, // University logo
+          courses: 1, // Populated courses (now including Tags)
+          scholarshipAvailability: 1,
+          spokenLanguage: 1,
+          uniType: 1,
+          inTakeMonth: 1,
+          inTakeYear: 1,
+          entranceExamRequired: 1,
+          studyLevel: 1,
+          uniLocation: 1,
+          uniTutionFees: 1,
+          uniOverview: 1,
+          uniAccomodation: 1,
+          uniLibrary: 1,
+          uniSports: 1,
+          studentLifeStyleInUni: 1,
+          countryName: 1,
+          countryFlag: 1,
+        },
+      },
+    ]);
+
+    if (!universityData || universityData.length === 0) {
+      return res.status(404).json({ message: "University not found" });
+    }
+
+    res.status(200).json({
+      data: universityData[0], // Since we're searching by name, return the first match
+      message: "University fetched successfully",
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 // Read (Get) all Universities
 // const getAllUniversities = async (req, res) => {
 //   try {
@@ -208,6 +307,7 @@ const deleteUniversity = async (req, res) => {
 module.exports = {
   createUniversity,
   getUniversityById,
+  getUniversityByName,
   getAllUniversities,
   updateUniversity,
   deleteUniversity,
