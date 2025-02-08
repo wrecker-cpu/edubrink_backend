@@ -52,43 +52,72 @@ const createAnalysisBatch = async (req, res) => {
   try {
     const batchData = req.body;
 
-    // Loop through the batch data and process each entry
+    if (!Array.isArray(batchData)) {
+      return res
+        .status(400)
+        .json({ message: "Invalid data format. Expected an array." });
+    }
+
+    const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+
     for (let data of batchData) {
       const { itemId, category, clicks, country } = data;
 
-      // Validate if category is valid
       const allowedCategories = ["University", "Country", "Blog", "Course"];
       if (!allowedCategories.includes(category)) {
         return res.status(400).json({ message: "Invalid category" });
       }
 
-      // Check if the analysis data for the itemId and category already exists
       const existingAnalysis = await analysisModel.findOne({
         itemId,
         category,
       });
 
       if (existingAnalysis) {
-        // If the record exists, increment the clicks and update the last clicked time
-        existingAnalysis.clicks += clicks;
-        existingAnalysis.lastClickedAt = Date.now();
-        await existingAnalysis.save(); // Save the updated record
+        // ✅ **Preserve previous clickHistory instead of overwriting**
+        let updatedClickHistory = [...existingAnalysis.clickHistory];
+
+        // Find today's entry
+        let todayEntry = updatedClickHistory.find(
+          (entry) => entry.date === today
+        );
+
+        if (todayEntry) {
+          todayEntry.clicks += clicks; // Increment today's clicks
+        } else {
+          updatedClickHistory.push({ date: today, clicks }); // Add new entry for today
+        }
+
+        // ✅ **Fix: Ensure click history is sorted by date**
+        updatedClickHistory.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+        // ✅ **Fix: Update total clicks**
+        existingAnalysis.clickHistory = updatedClickHistory;
+        existingAnalysis.clicks = updatedClickHistory.reduce(
+          (sum, entry) => sum + entry.clicks,
+          0
+        );
+        existingAnalysis.lastClickedAt = new Date();
+
+        await existingAnalysis.save();
       } else {
-        // If the record does not exist, create a new one
+        // If no previous record exists, create a new entry
         const newAnalysisData = new analysisModel({
           itemId,
           category,
-          clicks,
-          lastClickedAt: Date.now(),
+          clickHistory: [{ date: today, clicks }],
+          clicks, // ✅ **Set initial total clicks correctly**
+          lastClickedAt: new Date(),
           country: category === "Country" ? undefined : country,
         });
-        await newAnalysisData.save(); // Save the new record
+
+        await newAnalysisData.save();
       }
     }
 
-    return res.status(200).json({
-      message: "Batch analysis updated successfully",
-    });
+    return res
+      .status(200)
+      .json({ message: "Batch analysis updated successfully" });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

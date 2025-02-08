@@ -20,6 +20,14 @@ const analysisSchema = new Schema({
     type: Number,
     default: 0,
   },
+
+  clickHistory: [
+    {
+      date: { type: String, required: true }, // Format: "YYYY-MM-DD"
+      clicks: { type: Number, default: 0 },
+    },
+  ],
+
   lastClickedAt: {
     type: Date,
     default: Date.now,
