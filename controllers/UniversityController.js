@@ -35,7 +35,12 @@ const getUniversityByName = async (req, res) => {
   try {
     const universityData = await universityModel.aggregate([
       {
-        $match: { "uniName.en": name }, // Filter universities by name
+        $match: {
+          $or: [
+            { "uniName.en": { $regex: name, $options: "i" } }, // Case-insensitive search in English name
+            { "uniName.ar": { $regex: name, $options: "i" } }, // Case-insensitive search in Arabic name
+          ],
+        },
       },
       // Lookup country data by matching universities' ids in the country's universities array
       {
@@ -96,6 +101,11 @@ const getUniversityByName = async (req, res) => {
           uniSymbol: 1, // University logo
           courses: 1, // Populated courses (now including Tags)
           scholarshipAvailability: 1,
+          uniDiscount: 1,
+          uniMainImage: 1,
+          uniDeadline: 1,
+          uniDuration: 1,
+          uniStartDate: 1,
           spokenLanguage: 1,
           uniType: 1,
           inTakeMonth: 1,
@@ -245,8 +255,13 @@ const getAllUniversities = async (req, res) => {
           inTakeYear: 1,
           entranceExamRequired: 1,
           studyLevel: 1,
-          uniLocation: 1, // Include location data
+          uniLocation: 1,
           uniTutionFees: 1,
+          uniDiscount: 1,
+          uniMainImage: 1,
+          uniDuration: 1,
+          uniDeadline: 1,
+          uniStartDate: 1,
           uniOverview: 1,
           uniAccomodation: 1,
           uniLibrary: 1,

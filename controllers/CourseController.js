@@ -25,7 +25,9 @@ const getCourseById = async (req, res) => {
     }
     // If 'id' is not valid, try matching by course name
     else if (name) {
-      matchCondition = { "CourseName.en": name }; // Match by course name (in English)
+      matchCondition = {
+        $or: [{ "CourseName.en": name }, { "CourseName.ar": name }], // Compare both English & Arabic
+      };
     } else {
       return res
         .status(400)

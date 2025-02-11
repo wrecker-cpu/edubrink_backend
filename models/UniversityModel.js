@@ -13,6 +13,7 @@ const universitySchema = new Schema({
       ref: "Course", // Reference to the Course model
     },
   ],
+  uniMainImage: { type: String },
   scholarshipAvailability: {
     type: Boolean,
   },
@@ -59,6 +60,13 @@ const universitySchema = new Schema({
   },
   uniTutionFees: {
     type: Number,
+  },
+  uniStartDate: { type: String },
+  uniDeadline: { type: String },
+  uniDuration: { type: String },
+  uniDiscount: {
+    en: { type: String }, // English overview
+    ar: { type: String }, // Arabic overview
   },
   uniOverview: {
     en: { type: String }, // English overview
