@@ -59,6 +59,48 @@ const getAllCountries = async (req, res) => {
   }
 };
 
+const getAllCountriesByQuery = async (req, res) => {
+  try {
+    const { fields, populate } = req.query;
+
+    // Convert fields into a space-separated string for Mongoose `.select()`
+    const selectedFields = fields ? fields.split(",").join(" ") : "";
+
+    // Base query
+    let query = countryModel.find().select(selectedFields);
+
+    // Conditionally populate based on query parameters
+    if (populate) {
+      const populateFields = populate.split(",");
+
+      if (populateFields.includes("universities")) {
+        query = query.populate({
+          path: "universities",
+          select: "courseId uniName scholarshipAvailability uniTutionFees",
+          populate: {
+            path: "courseId",
+            model: "Course",
+            match: { _id: { $ne: null } },
+            select: "CourseName DeadLine CourseFees",
+          },
+        });
+      }
+
+      if (populateFields.includes("blog")) {
+        query = query.populate({
+          path: "blog",
+          select: "blogTitle blogSubtitle blogAdded",
+        });
+      }
+    }
+
+    const countries = await query.lean();
+    res.status(200).json({ data: countries });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 const getCountryByName = async (req, res) => {
   const name = req.params.name; // Assume 'name' is passed as a route parameter
   try {
@@ -262,6 +304,7 @@ module.exports = {
   getCountryById,
   getAllCountries,
   updateAllCountries,
+  getAllCountriesByQuery,
   updateCountry,
   deleteCountry,
   getCountryByName,

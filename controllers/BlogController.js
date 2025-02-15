@@ -33,6 +33,7 @@ const getBlogById = async (req, res) => {
 
 // Read (Get) all blog
 const getAllBlog = async (req, res) => {
+  const { admin } = req.query;
   try {
     const blogs = await blogModel.aggregate([
       {
@@ -44,27 +45,51 @@ const getAllBlog = async (req, res) => {
         },
       },
       {
-        $unwind: {
-          path: "$countries",
-          preserveNullAndEmptyArrays: true, // Keep blogs without associated countries
+        $group: {
+          _id: "$_id", // Group by blog ID
+          blogTitle: { $first: "$blogTitle" },
+          blogSubtitle: { $first: "$blogSubtitle" },
+          blogDescription: { $first: "$blogDescription" },
+          blogAdded: { $first: "$blogAdded" },
+          blogPhoto: { $first: "$blogPhoto" },
+          blogRelated: { $first: "$blogRelated" },
+          countries: {
+            $push: {
+              countryName: "$countries.countryName",
+              countryPopulation: "$countries.countryStudentPopulation",
+              countryCurrency: "$countries.countryCurrency",
+            },
+          }, // Keep each country as a separate object inside an array
         },
       },
       {
         $project: {
+          _id: 1,
           blogTitle: 1,
           blogSubtitle: 1,
           blogDescription: 1,
           blogAdded: 1,
           blogPhoto: 1,
           blogRelated: 1,
-          countryName: "$countries.countryName", // Include countryName
-          countryPopulation: "$countries.countryStudentPopulation", // Include student population
-          countryCurrency: "$countries.countryCurrency", // Include currency
+          countries: 1, // Separate countries inside an array
         },
       },
     ]);
 
-    res.status(200).json({ data: blogs });
+    let uniqueBlogs = blogs;
+
+    if (admin === "true") {
+      const seen = new Set();
+      uniqueBlogs = blogs.filter((blog) => {
+        if (!seen.has(blog._id.toString())) {
+          seen.add(blog._id.toString());
+          return true;
+        }
+        return false;
+      });
+    }
+
+    res.status(200).json({ data: uniqueBlogs });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
