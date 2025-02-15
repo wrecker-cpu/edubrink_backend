@@ -6,7 +6,7 @@ const universitySchema = new Schema({
     en: { type: String, required: true }, // English name
     ar: { type: String, required: true }, // Arabic name
   },
-  uniSymbol: { type: String, required: true },
+  uniSymbol: { type: String },
   courseId: [
     {
       type: Schema.Types.ObjectId,

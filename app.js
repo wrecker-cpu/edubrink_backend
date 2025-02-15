@@ -22,6 +22,7 @@ const blogRoutes = require("./routes/BlogRoutes");
 const keywordRoutes = require("./routes/KeywordRoutes");
 const analysisRoutes = require("./routes/AnalysisRoutes");
 const tagRoutes = require("./routes/TagRoutes");
+const applyRoutes = require("./routes/ApplyRoutes");
 
 app.get("/", (req, res) => {
   res.send("API is running...");
@@ -37,6 +38,7 @@ app.use("/api/blog", blogRoutes);
 app.use("/api/keyword", keywordRoutes);
 app.use("/api/analysis", analysisRoutes);
 app.use("/api/tags", tagRoutes);
+app.use("/api/apply", applyRoutes);
 
 // DATABASE CONNECTION
 const connectDB = async (retries = 5) => {
