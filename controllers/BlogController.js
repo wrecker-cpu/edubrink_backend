@@ -1,4 +1,5 @@
 const blogModel = require("../models/BlogModel");
+const countryModel = require("../models/CountryModel");
 
 // Create a new blog
 const createBlog = async (req, res) => {
@@ -97,16 +98,38 @@ const getAllBlog = async (req, res) => {
 
 const getBlogByName = async (req, res) => {
   const name = req.params.name; // Assume 'name' is passed as a route parameter
-  try {
-    // Find the blog by name
-    const blogData = await blogModel
-      .findOne({ "blogName.en": name })
+  const country = req.query.country; // Country is passed in the query parameters
 
+  try {
+    // Find the blog by either blogTitle.en or blogTitle.ar
+    const blogData = await blogModel
+      .findOne({
+        $or: [{ "blogTitle.en": name }, { "blogTitle.ar": name }],
+      })
       .lean();
 
     if (!blogData) {
-      return res.status(404).json({ message: "blog not found" });
+      return res.status(404).json({ message: "Blog not found" });
     }
+
+    // If a country is passed in the query, check if it exists in the Country model
+    if (country) {
+      const countryData = await countryModel
+        .findOne({
+          $or: [{ "countryName.en": country }, { "countryName.ar": country }],
+        })
+        .select("blog countryName")
+        .populate("blog", "_id blogTitle blogAdded blogPhoto "); // Populate related blogs if the country exists
+
+      if (countryData) {
+        // If country is found, include country data and populated blogs in the response
+        return res.status(200).json({ data: { ...blogData, countryData } });
+      } else {
+        return res.status(404).json({ message: "Country not found" });
+      }
+    }
+
+    // If no country is passed, just return the blog data
     res.status(200).json({ data: blogData });
   } catch (err) {
     res.status(500).json({ message: err.message });
