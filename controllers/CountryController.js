@@ -134,124 +134,6 @@ const getCountryByName = async (req, res) => {
   }
 };
 
-// const getFullDepthData = async (req, res) => {
-//   try {
-//     const result = await countryModel.aggregate([
-//       {
-//         $lookup: {
-//           from: "universities", // Lookup universities based on IDs in the universities array
-//           localField: "universities",
-//           foreignField: "_id",
-//           as: "universities",
-//         },
-//       },
-//       {
-//         $unwind: {
-//           path: "$universities",
-//           preserveNullAndEmptyArrays: true, // Preserve countries without universities
-//         },
-//       },
-//       {
-//         $lookup: {
-//           from: "courses", // Lookup courses based on IDs in the courseId array
-//           localField: "universities.courseId",
-//           foreignField: "_id",
-//           as: "universities.courseId",
-//           pipeline: [
-//             {
-//               $lookup: {
-//                 from: "tags", // Assuming there's a `tags` collection that stores Tags
-//                 localField: "Tags", // The field that references the Tags collection
-//                 foreignField: "_id",
-//                 as: "Tags", // Populate the Tags field
-//               },
-//             },
-//             {
-//               $project: {
-//                 CourseName: 1,
-//                 CourseDescription: 1,
-//                 CourseDuration: 1,
-//                 CourseStartDate: 1,
-//                 DeadLine: 1,
-//                 CourseFees: 1,
-//                 ModeOfStudy: 1,
-//                 Requirements: 1,
-//                 Tags: 1, // Include Tags field from the tags lookup
-//               },
-//             },
-//           ],
-//         },
-//       },
-//       {
-//         $group: {
-//           _id: "$_id", // Group back by country
-//           countryName: { $first: "$countryName" },
-//           countryCode: { $first: "$countryCode" },
-//           countryStudentPopulation: { $first: "$countryStudentPopulation" },
-//           countryCurrency: { $first: "$countryCurrency" },
-//           countryLanguages: { $first: "$countryLanguages" },
-//           universities: { $push: "$universities" }, // Recreate the universities array
-//           blog: { $first: "$blog" }, // Include blog field for lookup
-//         },
-//       },
-//       {
-//         $lookup: {
-//           from: "blogs", // Populate blogs using the blogs IDs
-//           localField: "blog", // Local field in the country collection
-//           foreignField: "_id", // Match with the _id in blogs collection
-//           as: "blog", // Populate blog field
-//         },
-//       },
-//       {
-//         $project: {
-//           countryName: 1,
-//           countryCode: 1,
-//           countryStudentPopulation: 1,
-//           countryCurrency: 1,
-//           countryLanguages: 1,
-//           universities: 1,
-//           blog: 1, // Fully populated blog
-//           totalUniversities: { $size: "$universities" }, // Count universities
-//           totalCourses: {
-//             $sum: {
-//               $map: {
-//                 input: "$universities",
-//                 as: "university",
-//                 in: { $size: { $ifNull: ["$$university.courseId", []] } }, // Count courses per university
-//               },
-//             },
-//           },
-//           totalBlogs: { $size: "$blog" }, // Count blogs
-//         },
-//       },
-//     ]);
-
-//     if (!result || result.length === 0) {
-//       return res.status(404).json({ message: "No data found" });
-//     }
-
-//     const responseData = {
-//       data: result,
-//       countriesCount: result.length,
-//       universitiesCount: result.reduce(
-//         (acc, country) => acc + country.totalUniversities,
-//         0
-//       ),
-//       coursesCount: result.reduce(
-//         (acc, country) => acc + country.totalCourses,
-//         0
-//       ),
-//       blogCount: result.reduce((acc, country) => acc + country.totalBlogs, 0),
-//     };
-
-//     // Store the response data in the cache with the cache key
-//     // cache.set(cacheKey, responseData);
-
-//     res.status(200).json(responseData); // Return the response
-//   } catch (error) {
-//     res.status(500).json({ message: error.message });
-//   }
-// };
 
 const getFullDepthData = async (req, res) => {
   try {
@@ -386,6 +268,310 @@ const getFullDepthData = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+
+
+// const getFullDepthData = async (req, res) => {
+//   try {
+//     const {
+//       Destination,
+//       ModeOfStudy,
+//       searchQuery,
+//       EntranceExam,
+//       StudyLevel,
+//       UniType,
+//       IntakeYear,
+//       IntakeMonth,
+//       CourseDuration,
+//       minBudget,
+//       maxBudget,
+//     } = req.query;
+
+//     const matchStage = {
+//       $match: {},
+//     };
+// if (Destination) {
+//   const destinationArray = Array.isArray(Destination)
+//     ? Destination
+//     : Destination.split(",").map((item) => item.trim()); // Convert string to array
+
+//   matchStage.$match["countryName.en"] = { $in: destinationArray };
+// }
+
+    
+
+//     const pipeline = [
+//       matchStage,
+//       {
+//         $lookup: {
+//           from: "universities",
+//           localField: "universities",
+//           foreignField: "_id",
+//           as: "universities",
+//         },
+//       },
+//       {
+//         $unwind: {
+//           path: "$universities",
+//           preserveNullAndEmptyArrays: true,
+//         },
+//       },
+//       {
+//         $lookup: {
+//           from: "courses",
+//           localField: "universities.courseId",
+//           foreignField: "_id",
+//           as: "universities.courseId",
+//           pipeline: [
+//             {
+//               $lookup: {
+//                 from: "tags",
+//                 localField: "Tags",
+//                 foreignField: "_id",
+//                 as: "Tags",
+//               },
+//             },
+//             {
+//               $project: {
+//                 CourseName: 1,
+//                 CourseDescription: 1,
+//                 CourseDuration: 1,
+//                 CourseStartDate: 1,
+//                 DeadLine: 1,
+//                 CourseFees: 1,
+//                 ModeOfStudy: 1,
+//                 Requirements: 1,
+//                 Tags: 1,
+//               },
+//             },
+//           ],
+//         },
+//       },
+//     ];
+
+//     // **Apply Additional Filters**
+
+//     if (ModeOfStudy) {
+//       pipeline.push({
+//         $match: {
+//           "universities.courseId.ModeOfStudy.en": {
+//             $regex: new RegExp(ModeOfStudy, "i"),
+//           },
+//         },
+//       });
+//     }
+
+//     if (searchQuery) {
+//       pipeline.push({
+//         $match: {
+//           "universities.courseId.Tags.TagName.en": {
+//             $regex: new RegExp(searchQuery, "i"),
+//           },
+//         },
+//       });
+//     }
+
+//     if (EntranceExam !== undefined) {
+//       pipeline.push({
+//         $match: {
+//           "universities.entranceExamRequired": EntranceExam === "true",
+//         },
+//       });
+//     }
+
+//     if (StudyLevel && StudyLevel !== "All") {
+//       pipeline.push({
+//         $match: {
+//           "universities.studyLevel": { $regex: new RegExp(StudyLevel, "i") },
+//         },
+//       });
+//     }
+
+//     if (UniType) {
+//       pipeline.push({
+//         $match: {
+//           "universities.uniType": { $regex: new RegExp(UniType, "i") },
+//         },
+//       });
+//     }
+
+//     if (IntakeYear) {
+//       pipeline.push({
+//         $match: {
+//           "universities.inTakeYear": Number(IntakeYear),
+//         },
+//       });
+//     }
+
+//     if (IntakeMonth) {
+//       pipeline.push({
+//         $match: {
+//           "universities.inTakeMonth": Number(IntakeMonth),
+//         },
+//       });
+//     }
+
+//     if (minBudget || maxBudget) {
+//       const min = minBudget ? Number(minBudget) : 0;
+//       const max = maxBudget ? Number(maxBudget) : Infinity;
+//       pipeline.push({
+//         $match: {
+//           "universities.courseId.CourseFees": { $gte: min, $lte: max },
+//         },
+//       });
+//     }
+
+//     if (CourseDuration) {
+//       const [minDuration, maxDuration] =
+//         CourseDuration === "60+"
+//           ? [60, Infinity]
+//           : CourseDuration.split("-").map(Number);
+    
+//       pipeline.push({
+//         $match: {
+//           "universities.courseId.CourseDuration": { $exists: true, $ne: null },
+//         },
+//       });
+    
+//       pipeline.push({
+//         $addFields: {
+//           "universities.courseId.ParsedDuration": {
+//             $toInt: {
+//               $ifNull: [
+//                 {
+//                   $regexFind: {
+//                     input: "$universities.courseId.CourseDuration",
+//                     regex: "\\d+",
+//                   },
+//                 },
+//                 { match: { 0: "0" } },
+//               ],
+//             },
+//           },
+//           "universities.courseId.IsYear": {
+//             $regexMatch: {
+//               input: "$universities.courseId.CourseDuration",
+//               regex: "year",
+//               options: "i",
+//             },
+//           },
+//         },
+//       });
+    
+//       pipeline.push({
+//         $addFields: {
+//           "universities.courseId.ParsedDuration": {
+//             $cond: {
+//               if: "$universities.courseId.IsYear",
+//               then: { $multiply: ["$universities.courseId.ParsedDuration", 12] },
+//               else: "$universities.courseId.ParsedDuration",
+//             },
+//           },
+//         },
+//       });
+    
+//       pipeline.push({
+//         $match: {
+//           $expr: {
+//             $and: [
+//               { $gte: ["$universities.courseId.ParsedDuration", minDuration] },
+//               { $lte: ["$universities.courseId.ParsedDuration", maxDuration] },
+//             ],
+//           },
+//         },
+//       });
+//     }
+    
+
+//     pipeline.push(
+//       {
+//         $group: {
+//           _id: "$_id",
+//           countryName: { $first: "$countryName" },
+//           countryCode: { $first: "$countryCode" },
+//           countryStudentPopulation: { $first: "$countryStudentPopulation" },
+//           countryCurrency: { $first: "$countryCurrency" },
+//           countryLanguages: { $first: "$countryLanguages" },
+//           universities: { $push: "$universities" },
+//           blog: { $first: "$blog" },
+//         },
+//       },
+//       {
+//         $lookup: {
+//           from: "blogs",
+//           localField: "blog",
+//           foreignField: "_id",
+//           as: "blog",
+//         },
+//       },
+//       {
+//         $project: {
+//           countryName: 1,
+//           countryCode: 1,
+//           countryStudentPopulation: 1,
+//           countryCurrency: 1,
+//           countryLanguages: 1,
+//           universities: 1,
+//           blog: 1,
+//           totalUniversities: { $size: "$universities" },
+//           totalCourses: {
+//             $sum: {
+//               $map: {
+//                 input: "$universities",
+//                 as: "university",
+//                 in: { $size: { $ifNull: ["$$university.courseId", []] } },
+//               },
+//             },
+//           },
+//           totalBlogs: { $size: "$blog" },
+//         },
+//       }
+//     );
+
+//     const result = await countryModel.aggregate(pipeline);
+
+//     if (!result || result.length === 0) {
+//       return res.status(404).json({ message: "No data found" });
+//     }
+
+//     const responseData = JSON.stringify({
+//       data: result,
+//       countriesCount: result.length,
+//       universitiesCount: result.reduce(
+//         (acc, country) => acc + country.universities.length,
+//         0
+//       ),
+//       coursesCount: result.reduce(
+//         (acc, country) =>
+//           acc +
+//           country.universities.reduce(
+//             (courseAcc, university) =>
+//               courseAcc + (university.courseId?.length || 0),
+//             0
+//           ),
+//         0
+//       ),
+//       blogCount: result.reduce((acc, country) => acc + country.blog.length, 0),
+//     });
+
+//     const acceptEncoding = req.headers["accept-encoding"] || "";
+//     res.setHeader("Content-Type", "application/json");
+
+//     if (acceptEncoding.includes("br")) {
+//       res.setHeader("Content-Encoding", "br");
+//       Readable.from(responseData).pipe(zlib.createBrotliCompress()).pipe(res);
+//     } else if (acceptEncoding.includes("gzip")) {
+//       res.setHeader("Content-Encoding", "gzip");
+//       Readable.from(responseData).pipe(zlib.createGzip()).pipe(res);
+//     } else {
+//       res.send(responseData);
+//     }
+//   } catch (error) {
+//     res.status(500).json({ message: error.message });
+//   }
+// };
+
+
 
 const updateAllCountries = async (req, res) => {
   try {

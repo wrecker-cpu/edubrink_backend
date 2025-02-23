@@ -18,6 +18,8 @@ const courseRoutes = require("../routes/CourseRoutes");
 const blogRoutes = require("../routes/BlogRoutes");
 const analysisRoutes = require("../routes/AnalysisRoutes");
 const applyRoutes = require("../routes/ApplyRoutes");
+const facultyRoutes = require("../routes/FacultyRoutes");
+const majorsRoutes = require("../routes/MajorsRoutes");
 
 app.get("/", (req, res) => {
   res.send("API is running...");
@@ -32,6 +34,8 @@ app.use("/api/google", googleRoutes);
 app.use("/api/blog", blogRoutes);
 app.use("/api/analysis", analysisRoutes);
 app.use("/api/apply", applyRoutes);
+app.use("/api/faculty", facultyRoutes);
+app.use("/api/majors", majorsRoutes);
 
 // DATABASE CONNECTION
 const connectDB = async (retries = 5) => {

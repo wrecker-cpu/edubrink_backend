@@ -76,6 +76,7 @@ const universitySchema = new Schema({
     en: { type: String }, // English accommodation description
     ar: { type: String }, // Arabic accommodation description
   },
+  uniFeatured:{type:Boolean},
   uniLibrary: {
     libraryPhotos: [{ type: String }],
     libraryDescription: {
