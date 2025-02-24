@@ -24,7 +24,7 @@ const getCountryById = async (req, res) => {
     // Find the country and populate the 'universities' field
     const countryData = await countryModel
       .findById(id)
-      .populate("universities blog")
+      .populate("universities blog faculty")
       .lean();
     if (!countryData) {
       return res.status(404).json({ message: "Country not found" });

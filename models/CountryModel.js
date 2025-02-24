@@ -9,6 +9,7 @@ const countrySchema = new Schema({
 
   countryStudentPopulation: { type: Number, required: true }, // Population
   countryCurrency: { type: String, required: true }, // Currency
+  countryCode: { type: String },
   countryLanguages: [
     {
       type: String,
@@ -22,6 +23,12 @@ const countrySchema = new Schema({
     en: { type: String }, // English overview
     ar: { type: String }, // Arabic overview
   },
+  faculty: [
+    {
+      type: Schema.Types.ObjectId,
+      ref: "Faculty",
+    },
+  ],
   universities: [
     {
       type: Schema.Types.ObjectId,
