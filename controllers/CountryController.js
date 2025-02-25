@@ -2,13 +2,23 @@ const zlib = require("zlib");
 const { Readable } = require("stream");
 const NodeCache = require("node-cache");
 const countryModel = require("../models/CountryModel");
-const cache = new NodeCache({ stdTTL: 600, checkperiod: 60 });
+const cache = new NodeCache({ stdTTL: 300, checkperiod: 320 }); // 5 min TTL
+
+const clearCountryCache = () => {
+  const keys = cache.keys(); // Get all cached keys
+  keys.forEach((key) => {
+    if (key.startsWith("countries_")) {
+      cache.del(key); // Delete only country-related caches
+    }
+  });
+};
 
 // Create a new country
 const createCountry = async (req, res) => {
   try {
     const countryData = new countryModel(req.body);
     await countryData.save();
+    clearCountryCache();
     res
       .status(201)
       .json({ data: countryData, message: "Country created successfully" });
@@ -61,17 +71,65 @@ const getAllCountries = async (req, res) => {
   }
 };
 
+// const getAllCountriesByQuery = async (req, res) => {
+//   try {
+//     const { fields, populate } = req.query;
+
+//     // Convert fields into a space-separated string for Mongoose `.select()`
+//     const selectedFields = fields ? fields.split(",").join(" ") : "";
+
+//     // Base query
+//     let query = countryModel.find().select(selectedFields);
+
+//     // Conditionally populate based on query parameters
+//     if (populate) {
+//       const populateFields = populate.split(",");
+
+//       if (populateFields.includes("universities")) {
+//         query = query.populate({
+//           path: "universities",
+//           select: "courseId uniName scholarshipAvailability uniTutionFees",
+//           populate: {
+//             path: "courseId",
+//             model: "Course",
+//             match: { _id: { $ne: null } },
+//             select: "CourseName DeadLine CourseFees",
+//           },
+//         });
+//       }
+
+//       if (populateFields.includes("blog")) {
+//         query = query.populate({
+//           path: "blog",
+//           select: "blogTitle blogSubtitle blogAdded",
+//         });
+//       }
+//     }
+
+//     const countries = await query.lean();
+//     res.status(200).json({ data: countries });
+//   } catch (err) {
+//     res.status(500).json({ message: err.message });
+//   }
+// };
+
 const getAllCountriesByQuery = async (req, res) => {
   try {
     const { fields, populate } = req.query;
 
-    // Convert fields into a space-separated string for Mongoose `.select()`
-    const selectedFields = fields ? fields.split(",").join(" ") : "";
+    // Generate cache key
+    const cacheKey = `countries_${fields || "all"}_${populate || "none"}`;
 
-    // Base query
+    // Check cache
+    const cachedData = cache.get(cacheKey);
+    if (cachedData) {
+      return res.status(200).json({ data: cachedData, cached: true });
+    }
+
+    // Query database
+    const selectedFields = fields ? fields.split(",").join(" ") : "";
     let query = countryModel.find().select(selectedFields);
 
-    // Conditionally populate based on query parameters
     if (populate) {
       const populateFields = populate.split(",");
 
@@ -97,12 +155,15 @@ const getAllCountriesByQuery = async (req, res) => {
     }
 
     const countries = await query.lean();
-    res.status(200).json({ data: countries });
+
+    // Store in cache
+    cache.set(cacheKey, countries, 300);
+
+    res.status(200).json({ data: countries, cached: false });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
-
 const getCountryByName = async (req, res) => {
   const name = req.params.name; // Assume 'name' is passed as a route parameter
   try {
@@ -577,7 +638,7 @@ const updateAllCountries = async (req, res) => {
   try {
     const updateCountry = req.body;
     const result = await countryModel.updateMany({}, updateCountry);
-
+    clearCountryCache();
     res.status(200).json({
       message: "Country updated successfully",
       modifiedCount: result.modifiedCount,
@@ -599,6 +660,7 @@ const updateCountry = async (req, res) => {
     if (!countryData) {
       return res.status(404).json({ message: "country not found" });
     }
+    clearCountryCache();
     res
       .status(200)
       .json({ data: countryData, message: "country updated successfully" });
@@ -615,6 +677,7 @@ const deleteCountry = async (req, res) => {
     if (!deletedcountry) {
       return res.status(404).json({ message: "country not found" });
     }
+    clearCountryCache();
     res.status(200).json({ message: "country deleted successfully" });
   } catch (err) {
     res.status(500).json({ message: err.message });
