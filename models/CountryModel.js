@@ -27,18 +27,21 @@ const countrySchema = new Schema({
     {
       type: Schema.Types.ObjectId,
       ref: "Faculty",
+      index: true, // Helps with population queries
     },
   ],
   universities: [
     {
       type: Schema.Types.ObjectId,
       ref: "University", // Reference to the University model
+      index: true, // Helps with population queries
     },
   ],
   blog: [
     {
       type: Schema.Types.ObjectId,
       ref: "Blog",
+      index: true, // Helps with population queries
     },
   ],
 });
