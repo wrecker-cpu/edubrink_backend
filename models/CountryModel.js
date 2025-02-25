@@ -11,41 +11,42 @@ const countrySchema = new Schema({
   countryCode: {
     type: String,
     index: true,
-    countryLanguages: [
-      {
-        type: String,
-      },
-    ],
-    countryPhotos: {
-      mainPagePhoto: { type: String },
-      countryFlag: { type: String },
-    },
-    countryOverview: {
-      en: { type: String }, // English overview
-      ar: { type: String }, // Arabic overview
-    },
-    faculty: [
-      {
-        type: Schema.Types.ObjectId,
-        ref: "Faculty",
-        index: true, // Helps with population queries
-      },
-    ],
-    universities: [
-      {
-        type: Schema.Types.ObjectId,
-        ref: "University", // Reference to the University model
-        index: true, // Helps with population queries
-      },
-    ],
-    blog: [
-      {
-        type: Schema.Types.ObjectId,
-        ref: "Blog",
-        index: true, // Helps with population queries
-      },
-    ],
   },
+  countryLanguages: [
+    {
+      type: String,
+    },
+  ],
+  countryPhotos: {
+    mainPagePhoto: { type: String },
+    countryFlag: { type: String },
+  },
+  countryOverview: {
+    en: { type: String }, // English overview
+    ar: { type: String }, // Arabic overview
+  },
+
+  faculty: [
+    {
+      type: Schema.Types.ObjectId,
+      ref: "Faculty",
+      index: true, // Helps with population queries
+    },
+  ],
+  universities: [
+    {
+      type: Schema.Types.ObjectId,
+      ref: "University", // Reference to the University model
+      index: true, // Helps with population queries
+    },
+  ],
+  blog: [
+    {
+      type: Schema.Types.ObjectId,
+      ref: "Blog",
+      index: true, // Helps with population queries
+    },
+  ],
 });
 
 module.exports = mongoose.model("Country", countrySchema); // Exporting the model
