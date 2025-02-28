@@ -220,14 +220,7 @@ const getFullDepthData = async (req, res) => {
           foreignField: "_id",
           as: "universities.courseId",
           pipeline: [
-            {
-              $lookup: {
-                from: "tags", // Assuming there's a `tags` collection that stores Tags
-                localField: "Tags", // The field that references the Tags collection
-                foreignField: "_id",
-                as: "Tags", // Populate the Tags field
-              },
-            },
+            
             {
               $project: {
                 CourseName: 1,

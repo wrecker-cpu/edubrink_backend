@@ -7,9 +7,21 @@ const facultySchema = new Schema({
     ar: { type: String, required: true },
   },
   studyLevel: [{ type: String }],
-  university: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "University", // Correct reference
+  major: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Major", // Correct reference
+    },
+  ],
+  universities: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "University", // New field to store the university reference
+    },
+  ],
+  created_at: {
+    type: Date,
+    default: Date.now,
   },
   facultyDescription: {
     en: { type: String },

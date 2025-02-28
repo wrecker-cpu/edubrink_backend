@@ -5,6 +5,7 @@ const router = require("express").Router();
 router.post("/", FacultyController.createFaculty);
 router.put("/:id", FacultyController.updateFaculty);
 router.get("/:id", FacultyController.getFacultyById);
+router.get("/name/getUniNames", FacultyController.getAllFacultyWithUniNames);
 router.get("/", FacultyController.getAllFaculty);
 router.delete("/:id", FacultyController.deleteFaculty);
 

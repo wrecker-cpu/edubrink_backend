@@ -54,6 +54,8 @@ const getCourseById = async (req, res) => {
           CourseFees: 1,
           ModeOfStudy: 1,
           Requirements: 1,
+          Tags: 1,
+          university: 1,
           uniName: "$university.uniName",
           uniSymbol: "$university.uniSymbol",
         },

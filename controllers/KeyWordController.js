@@ -11,7 +11,7 @@ const getKeywords = async (req, res) => {
     const countries = await countryModel.find({}, "countryName");
     const universities = await universityModel.find({}, "uniName");
     const courses = await courseModel.find({}, "CourseName");
-    const tags = await tagModel.find({}, "TagName keywords");
+    const tags = await tagModel.find({}, "tags");
 
     // Extract and group keywords
     const blogKeywords = blogs
@@ -30,12 +30,13 @@ const getKeywords = async (req, res) => {
       .flatMap((course) => [course.CourseName?.en, course.CourseName?.ar])
       .filter(Boolean);
 
-    const tagKeywords = tags
+      const tagKeywords = tags
       .map((tag) => ({
-        TagName: tag.TagName,
-        keywords: [...tag.keywords.en, ...tag.keywords.ar], // Flatten keywords from both languages
+        en: tag.tags.en || [], // Ensure `en` is an array, even if empty
+        ar: tag.tags.ar || [], // Ensure `ar` is an array, even if empty
       }))
-      .filter((tag) => tag.keywords.length > 0);
+      .filter((tag) => tag.en.length > 0 || tag.ar.length > 0); // Remove empty objects
+    
 
     // Create response structure
     const data = [

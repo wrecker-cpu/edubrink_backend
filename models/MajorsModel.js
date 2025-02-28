@@ -14,6 +14,9 @@ const majorSchema = new Schema({
   duration: {
     type: Number,
   },
+  durationUnits: {
+    type: String,
+  },
   majorIntakeYear: {
     type: Number,
   },

@@ -10,13 +10,26 @@ const universitySchema = new Schema({
   courseId: [
     {
       type: Schema.Types.ObjectId,
-      ref: "Course", // Reference to the Course model
+      ref: "Course",
+    },
+  ],
+  faculty: [
+    {
+      type: Schema.Types.ObjectId,
+      ref: "Faculty",
     },
   ],
   uniMainImage: { type: String },
   scholarshipAvailability: {
     type: Boolean,
   },
+  housing_available: { type: Boolean },
+  living_cost: { type: String },
+  featured: { type: Boolean },
+  admission_requirements: [{ type: String }],
+  preparatory_year: { type: Boolean },
+  preparatory_year_fees: { type: String },
+  study_programs: [{ type: String }],
   spokenLanguage: [
     {
       type: String,
@@ -35,10 +48,11 @@ const universitySchema = new Schema({
   entranceExamRequired: {
     type: Boolean,
   },
-  studyLevel: {
-    type: String,
-    enum: ["UnderGraduate", "PostGraduate", "Foundation", "Doctorate"],
-  },
+  studyLevel: [
+    {
+      type: String,
+    },
+  ],
   uniLocation: {
     uniAddress: {
       en: { type: String, required: true }, // English address
@@ -61,6 +75,10 @@ const universitySchema = new Schema({
   uniTutionFees: {
     type: Number,
   },
+  uniCreationDate: {
+    type: Date,
+    default: Date.now,
+  },
   uniStartDate: { type: String },
   uniDeadline: { type: String },
   uniDuration: { type: String },
@@ -76,7 +94,7 @@ const universitySchema = new Schema({
     en: { type: String }, // English accommodation description
     ar: { type: String }, // Arabic accommodation description
   },
-  uniFeatured:{type:Boolean},
+  uniFeatured: { type: Boolean },
   uniLibrary: {
     libraryPhotos: [{ type: String }],
     libraryDescription: {

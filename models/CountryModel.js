@@ -26,6 +26,19 @@ const countrySchema = new Schema({
     ar: { type: String }, // Arabic overview
   },
 
+  metaTitle: {
+    en: { type: String, index: true }, // SEO Meta Title in English
+    ar: { type: String, index: true }, // SEO Meta Title in Arabic
+  },
+  metaDescription: {
+    en: { type: String }, // SEO Meta Description in English
+    ar: { type: String }, // SEO Meta Description in Arabic
+  },
+  keywords: {
+    en: [{ type: String }], // Array of SEO Keywords in English
+    ar: [{ type: String }], // Array of SEO Keywords in Arabic
+  },
+
   faculty: [
     {
       type: Schema.Types.ObjectId,
