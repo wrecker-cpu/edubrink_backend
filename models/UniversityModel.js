@@ -25,7 +25,6 @@ const universitySchema = new Schema({
   },
   housing_available: { type: Boolean },
   living_cost: { type: String },
-  featured: { type: Boolean },
   admission_requirements: [{ type: String }],
   preparatory_year: { type: Boolean },
   preparatory_year_fees: { type: String },

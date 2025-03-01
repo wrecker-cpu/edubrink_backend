@@ -278,6 +278,7 @@ const getAllUniversities = async (req, res) => {
           uniTutionFees: 1,
           uniDiscount: 1,
           uniMainImage: 1,
+          uniFeatured: 1,
           uniDuration: 1,
           uniDeadline: 1,
           uniStartDate: 1,
@@ -285,6 +286,12 @@ const getAllUniversities = async (req, res) => {
           uniAccomodation: 1,
           uniLibrary: 1,
           uniSports: 1,
+          scholarshipAvailability: 1,
+          admission_requirements: 1,
+          preparatory_year: 1,
+          preparatory_year_fees: 1,
+          housing_available: 1,
+          living_cost: 1,
           studentLifeStyleInUni: 1,
           countryName: 1, // Added countryName field
           countryFlag: 1, // Added countryFlag field from countryPhotos
