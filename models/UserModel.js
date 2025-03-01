@@ -16,10 +16,12 @@ const userSchema = new Schema({
     default: null,
   },
   verified: { type: Boolean },
+  Status: { type: Boolean },
+  createdAt:{type:Date,default:Date.now},
   Address: { type: String },
   MaritalStatus: { type: String, enum: ["Married", "Not-Married"] },
   Gender: { type: String, enum: ["Male", "Female", "Non-Binary"] },
-  ProfilePicture: { type: String },
+  // ProfilePicture: { type: String },
 });
 userSchema.methods.changedPassword = function (jwtIat) {
   if (this.passwordChangedAt) {

@@ -8,6 +8,10 @@ router.post("/verifyotp", userController.verifyOtp);
 router.post("/resendotp", userController.resendOtp);
 // Route for getting all users (admin-protected)
 router.get("/", auth.protect, auth.restrictToAdmin, userController.getAllUser);
+router.post("/admin/", userController.createUserByAdmin);
+router.get("/admin/", userController.getAllUserByAdmin);
+router.put("/admin/:id", userController.updateUserByAdmin);
+router.get("/admin/:id", userController.getUserAdminbyID);
 
 // Route for getting, updating, and deleting a user by ID
 router.get("/data/:id", auth.protect, userController.getUserbyID);

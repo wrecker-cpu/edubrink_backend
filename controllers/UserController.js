@@ -34,6 +34,7 @@ const createUser = async (req, res) => {
       DateOfBirth: "",
       isAdmin: false,
       passwordChangedAt: Date.now(),
+      status: true,
       verified: false,
     };
 
@@ -65,6 +66,86 @@ const createUser = async (req, res) => {
     res
       .status(500)
       .json({ message: "Error in creating", error: error.message });
+  }
+};
+
+const createUserByAdmin = async (req, res) => {
+  try {
+    const { Email, Password, FullName, DateOfBirth, isAdmin, Status } =
+      req.body;
+
+    // Check if the user already exists
+    const existingUser = await userModel.findOne({ Email });
+
+    if (existingUser) {
+      return res
+        .status(400)
+        .json({ message: "User with this email already exists" });
+    }
+
+    // Create user object
+    const newUser = {
+      Email,
+      Password: encrypt.generatePassword(Password), // Hash the password
+      FullName: FullName || "",
+      DateOfBirth: DateOfBirth || "",
+      isAdmin: isAdmin || false,
+      passwordChangedAt: Date.now(),
+      verified: true, // Admin-created users are verified by default
+      Status: Status || false,
+    };
+
+    // Save the user
+    const savedUser = await userModel.create(newUser);
+
+    return res.status(201).json({
+      message: "User created successfully by admin",
+      user: savedUser,
+    });
+  } catch (error) {
+    console.error("Admin User Creation Error:", error);
+    return res
+      .status(500)
+      .json({ message: "Error creating user", error: error.message });
+  }
+};
+
+const getAllUserByAdmin = async (req, res) => {
+  try {
+    const user = await userModel.find().lean(); // Use .lean() for faster query
+    res.status(200).json({ data: user, message: "Users fetched successfully" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+const updateUserByAdmin = async (req, res) => {
+  const id = req.params.id;
+  try {
+    const userData = await userModel
+      .findByIdAndUpdate(id, req.body, { new: true })
+      .lean(); // Use .lean()
+    res
+      .status(200)
+      .json({ data: userData, message: "User updated successfully" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+const getUserAdminbyID = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const user = await userModel.findById(id).lean();
+    if (user) {
+      res
+        .status(200)
+        .json({ message: "User fetched successfully", data: user });
+    } else {
+      res.status(404).json({ message: "User not found" });
+    }
+  } catch (error) {
+    res.status(500).json({ message: "Server Error", error: error });
   }
 };
 
@@ -294,6 +375,10 @@ const loginUser = async (req, res) => {
 module.exports = {
   createUser,
   getAllUser,
+  createUserByAdmin,
+  getAllUserByAdmin,
+  updateUserByAdmin,
+  getUserAdminbyID,
   updateUser,
   updateAllUsers,
   getUserbyID,

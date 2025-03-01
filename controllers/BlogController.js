@@ -54,6 +54,11 @@ const getAllBlog = async (req, res) => {
           blogAdded: { $first: "$blogAdded" },
           blogPhoto: { $first: "$blogPhoto" },
           blogRelated: { $first: "$blogRelated" },
+          blogAuthor: { $first: "$blogAuthor" },
+          blogCategory: { $first: "$blogCategory" },
+          publishImmediately: { $first: "$publishImmediately" },
+          featuredBlog: { $first: "$featuredBlog" },
+          blogTags: { $first: "$blogTags" },
           countries: {
             $push: {
               countryName: "$countries.countryName",
@@ -72,6 +77,11 @@ const getAllBlog = async (req, res) => {
           blogAdded: 1,
           blogPhoto: 1,
           blogRelated: 1,
+          blogAuthor: 1,
+          blogCategory: 1,
+          publishImmediately: 1,
+          featuredBlog: 1,
+          blogTags: 1,
           countries: 1, // Separate countries inside an array
         },
       },

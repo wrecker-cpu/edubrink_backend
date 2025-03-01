@@ -195,7 +195,6 @@ const getCountryByName = async (req, res) => {
   }
 };
 
-
 const getFullDepthData = async (req, res) => {
   try {
     const result = await countryModel.aggregate([
@@ -220,7 +219,6 @@ const getFullDepthData = async (req, res) => {
           foreignField: "_id",
           as: "universities.courseId",
           pipeline: [
-            
             {
               $project: {
                 CourseName: 1,
@@ -323,8 +321,6 @@ const getFullDepthData = async (req, res) => {
   }
 };
 
-
-
 // const getFullDepthData = async (req, res) => {
 //   try {
 //     const {
@@ -351,8 +347,6 @@ const getFullDepthData = async (req, res) => {
 
 //   matchStage.$match["countryName.en"] = { $in: destinationArray };
 // }
-
-    
 
 //     const pipeline = [
 //       matchStage,
@@ -480,13 +474,13 @@ const getFullDepthData = async (req, res) => {
 //         CourseDuration === "60+"
 //           ? [60, Infinity]
 //           : CourseDuration.split("-").map(Number);
-    
+
 //       pipeline.push({
 //         $match: {
 //           "universities.courseId.CourseDuration": { $exists: true, $ne: null },
 //         },
 //       });
-    
+
 //       pipeline.push({
 //         $addFields: {
 //           "universities.courseId.ParsedDuration": {
@@ -511,7 +505,7 @@ const getFullDepthData = async (req, res) => {
 //           },
 //         },
 //       });
-    
+
 //       pipeline.push({
 //         $addFields: {
 //           "universities.courseId.ParsedDuration": {
@@ -523,7 +517,7 @@ const getFullDepthData = async (req, res) => {
 //           },
 //         },
 //       });
-    
+
 //       pipeline.push({
 //         $match: {
 //           $expr: {
@@ -535,7 +529,6 @@ const getFullDepthData = async (req, res) => {
 //         },
 //       });
 //     }
-    
 
 //     pipeline.push(
 //       {
@@ -624,8 +617,6 @@ const getFullDepthData = async (req, res) => {
 //     res.status(500).json({ message: error.message });
 //   }
 // };
-
-
 
 const updateAllCountries = async (req, res) => {
   try {
