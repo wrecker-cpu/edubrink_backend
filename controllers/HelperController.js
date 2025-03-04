@@ -6,6 +6,7 @@ const BlogModel = require("../models/BlogModel");
 const MajorsModel = require("../models/MajorsModel");
 const UniversityModel = require("../models/UniversityModel");
 const CountryModel = require("../models/CountryModel");
+const UserModel = require("../models/UserModel"); // Import UserModel
 
 // Initialize cache (TTL: 10 minutes)
 const cache = new NodeCache({ stdTTL: 600, checkperiod: 620 });
@@ -22,7 +23,7 @@ const getAllDropdownData = async (req, res) => {
     }
 
     // Fetch data if not in cache
-    const [tags, courses, faculties, blogs, majors, universities,countries] =
+    const [tags, courses, faculties, blogs, majors, universities, countries, userCount] =
       await Promise.all([
         TagModel.find().select("_id tags").lean(),
         CourseModel.find().select("_id CourseName").lean(),
@@ -31,6 +32,7 @@ const getAllDropdownData = async (req, res) => {
         MajorsModel.find().select("_id majorName").lean(),
         UniversityModel.find().select("_id uniName").lean(),
         CountryModel.find().select("_id countryName").lean(),
+        UserModel.countDocuments(), // Get only the count of users
       ]);
 
     const dropdownData = {
@@ -41,6 +43,7 @@ const getAllDropdownData = async (req, res) => {
       majors,
       universities,
       countries,
+      userCount, // Include user count
     };
 
     cache.set("dropdownData", dropdownData);
