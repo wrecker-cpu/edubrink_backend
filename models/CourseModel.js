@@ -13,13 +13,39 @@ const courseSchema = new Schema({
   CourseFees: { type: Number },
   ModeOfStudy: { en: [{ type: String }], ar: [{ type: String }] },
   Requirements: { en: [{ type: String }], ar: [{ type: String }] },
-  Tags: {en: [{ type: String }], ar: [{ type: String }]},
+  Tags: { en: [{ type: String }], ar: [{ type: String }] },
   scholarshipsAvailable: { type: Boolean },
+  scholarshipType: {
+    type: String,
+    enum: ["none", "partial", "full"],
+    default: "none",
+  },
+  scholarshipPercentage: { type: String },
   DiscountAvailable: { type: Boolean },
+  DiscountValue: { type: String },
   MostPopular: { type: Boolean },
   university: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "University", 
+    ref: "University",
+  },
+  CourseCategory: {
+    type: String,
+    required: true,
+  },
+  provider: { type: String },
+  seo: {
+    metaTitle: {
+      en: { type: String, index: true },
+      ar: { type: String, index: true },
+    },
+    metaDescription: {
+      en: { type: String },
+      ar: { type: String },
+    },
+    metaKeywords: {
+      en: [{ type: String }], // Array of SEO Keywords in English
+      ar: [{ type: String }], // Array of SEO Keywords in Arabic
+    },
   },
 });
 

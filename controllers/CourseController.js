@@ -53,7 +53,18 @@ const getCourseById = async (req, res) => {
           DeadLine: 1,
           CourseFees: 1,
           ModeOfStudy: 1,
+          StudyLevel: 1,
+          Languages: 1,
+          scholarshipsAvailable: 1,
+          scholarshipType: 1, // ✅ Added missing field
+          scholarshipPercentage: 1, // ✅ Added missing field
+          DiscountAvailable: 1,
+          DiscountValue: 1, // ✅ Added missing field
+          MostPopular: 1,
           Requirements: 1,
+          CourseCategory: 1, // ✅ Added missing field
+          provider: 1, // ✅ Added missing field
+          seo: 1, // ✅ Include the entire SEO object
           Tags: 1,
           university: 1,
           uniName: "$university.uniName",
@@ -77,7 +88,10 @@ const getAllCourses = async (req, res) => {
     // Check if the `all` query parameter is set to true
     if (req.query.all === "true") {
       // Fetch all courses without limit or skip
-      const courses = await courseModel.find().populate("Tags").lean();
+      const courses = await courseModel
+        .find()
+        .populate("Tags university")
+        .lean();
       return res.status(200).json({ data: courses });
     }
 
@@ -88,7 +102,7 @@ const getAllCourses = async (req, res) => {
 
     const courses = await courseModel
       .find()
-      .populate("Tags")
+      .populate("Tags university")
       .skip(skip)
       .limit(limit)
       .lean();

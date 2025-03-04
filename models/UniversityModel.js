@@ -71,6 +71,33 @@ const universitySchema = new Schema({
       ar: { type: String, required: true },
     },
   },
+  campuses: [
+    {
+      campusName: { en: { type: String }, ar: { type: String } },
+      campusLocation: {
+        uniAddress: { en: { type: String }, ar: { type: String } },
+        uniPincode: { type: String },
+        uniCity: { en: { type: String }, ar: { type: String } },
+        uniState: { en: { type: String }, ar: { type: String } },
+        uniCountry: { en: { type: String }, ar: { type: String } },
+      },
+      campusFacilities: [{ type: String }],
+    },
+  ],
+  seo: {
+    metaTitle: {
+      en: { type: String, index: true },
+      ar: { type: String, index: true },
+    },
+    metaDescription: {
+      en: { type: String },
+      ar: { type: String },
+    },
+    metaKeywords: {
+      en: [{ type: String }], // Array of SEO Keywords in English
+      ar: [{ type: String }], // Array of SEO Keywords in Arabic
+    },
+  },
   uniTutionFees: {
     type: Number,
   },

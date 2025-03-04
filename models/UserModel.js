@@ -17,7 +17,7 @@ const userSchema = new Schema({
   },
   verified: { type: Boolean },
   Status: { type: Boolean },
-  createdAt:{type:Date,default:Date.now},
+  createdAt: { type: Date, default: Date.now },
   Address: { type: String },
   MaritalStatus: { type: String, enum: ["Married", "Not-Married"] },
   Gender: { type: String, enum: ["Male", "Female", "Non-Binary"] },

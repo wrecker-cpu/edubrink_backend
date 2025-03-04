@@ -34,7 +34,7 @@ const countrySchema = new Schema({
     en: { type: String }, // SEO Meta Description in English
     ar: { type: String }, // SEO Meta Description in Arabic
   },
-  keywords: {
+  metakeywords: {
     en: [{ type: String }], // Array of SEO Keywords in English
     ar: [{ type: String }], // Array of SEO Keywords in Arabic
   },
@@ -60,6 +60,8 @@ const countrySchema = new Schema({
       index: true, // Helps with population queries
     },
   ],
+  hotDestination: { type: Boolean },
+  livingCost: { type: String },
 });
 
 module.exports = mongoose.model("Country", countrySchema); // Exporting the model

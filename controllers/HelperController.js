@@ -5,6 +5,7 @@ const FacultyModel = require("../models/FacultyModel");
 const BlogModel = require("../models/BlogModel");
 const MajorsModel = require("../models/MajorsModel");
 const UniversityModel = require("../models/UniversityModel");
+const CountryModel = require("../models/CountryModel");
 
 // Initialize cache (TTL: 10 minutes)
 const cache = new NodeCache({ stdTTL: 600, checkperiod: 620 });
@@ -21,7 +22,7 @@ const getAllDropdownData = async (req, res) => {
     }
 
     // Fetch data if not in cache
-    const [tags, courses, faculties, blogs, majors, universities] =
+    const [tags, courses, faculties, blogs, majors, universities,countries] =
       await Promise.all([
         TagModel.find().select("_id tags").lean(),
         CourseModel.find().select("_id CourseName").lean(),
@@ -29,6 +30,7 @@ const getAllDropdownData = async (req, res) => {
         BlogModel.find().select("_id blogTitle").lean(),
         MajorsModel.find().select("_id majorName").lean(),
         UniversityModel.find().select("_id uniName").lean(),
+        CountryModel.find().select("_id countryName").lean(),
       ]);
 
     const dropdownData = {
@@ -38,6 +40,7 @@ const getAllDropdownData = async (req, res) => {
       blogs,
       majors,
       universities,
+      countries,
     };
 
     cache.set("dropdownData", dropdownData);

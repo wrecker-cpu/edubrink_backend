@@ -65,7 +65,7 @@ const getFacultyById = async (req, res) => {
 
 const getAllFaculty = async (req, res) => {
   try {
-    const Faculty = await FacultyModel.find().populate("major").lean();
+    const Faculty = await FacultyModel.find().populate("universities major").lean();
 
     res.status(200).json({ data: Faculty });
   } catch (err) {
