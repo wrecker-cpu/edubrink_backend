@@ -12,6 +12,33 @@ const blogSchema = new Schema({
   blogDescription: { en: { type: String }, ar: { type: String } },
   blogAdded: { type: Date, default: Date.now },
   blogPhoto: { type: String },
+  status: {
+    type: String,
+    enum: ["Draft", "Pending Review", "Published"],
+    default: "Draft",
+  }, // Article Status
+  excerpt: { en: { type: String }, ar: { type: String } },
+  scheduledPublishDate: { type: Date }, // Scheduling future publish dates
+  allowComments: { type: Boolean, default: true }, // Enable/Disable comments
+  visibility: {
+    type: String,
+    enum: ["Public", "Private", "Password Protected"],
+    default: "Public",
+  }, // Visibility Settings
+  seo: {
+    metaTitle: {
+      en: { type: String, index: true },
+      ar: { type: String, index: true },
+    },
+    metaDescription: {
+      en: { type: String },
+      ar: { type: String },
+    },
+    metaKeywords: {
+      en: [{ type: String }], // Array of SEO Keywords in English
+      ar: [{ type: String }], // Array of SEO Keywords in Arabic
+    },
+  },
 });
 
 module.exports = mongoose.model("Blog", blogSchema); //exporting the model
