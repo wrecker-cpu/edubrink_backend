@@ -76,7 +76,7 @@ function signToken(id,isAdmin) {
 }
 
 function createSendToken(user, statusCode, res) {
-  const token = signToken(user._id, user.isAdmin);
+  const token = signToken(user._id, user.isAdmin,user.ActionStatus);
 
   const cookieOptions = {
     expiresIn: jwtCookieExpires,
