@@ -1,11 +1,25 @@
 const blogModel = require("../models/BlogModel");
 const countryModel = require("../models/CountryModel");
+const notificationModel = require("../models/NotificationModel");
+const { createNotification } = require("../controllers/HelperController");
 
 // Create a new blog
 const createBlog = async (req, res) => {
   try {
-    const blogData = new blogModel(req.body);
+    const { blogCountry, ...blogDetails } = req.body;
+
+    const blogData = new blogModel({ ...blogDetails, blogCountry });
     await blogData.save();
+
+    await createNotification("Blog", blogData, "blogTitle", "created");
+
+    if (blogCountry) {
+      await countryModel.findByIdAndUpdate(
+        blogCountry,
+        { $push: { blog: blogData._id } },
+        { new: true }
+      );
+    }
     res
       .status(201)
       .json({ data: blogData, message: "blog created successfully" });
@@ -21,7 +35,7 @@ const getBlogById = async (req, res) => {
     // Find the blog and populate the 'universities' field
     const blogData = await blogModel
       .findById(id)
-
+      .populate("blogCountry")
       .lean();
     if (!blogData) {
       return res.status(404).json({ message: "blog not found" });
@@ -150,16 +164,48 @@ const getBlogByName = async (req, res) => {
 const updateBlog = async (req, res) => {
   const id = req.params.id;
   try {
-    const blogData = await blogModel
-      .findByIdAndUpdate(id, req.body, { new: true })
-      .lean();
-    if (!blogData) {
-      return res.status(404).json({ message: "blog not found" });
+    const { blogCountry, ...blogDetails } = req.body;
+
+    // Step 1: Find the existing blog before updating
+    const existingBlog = await blogModel.findById(id).lean();
+    if (!existingBlog) {
+      return res.status(404).json({ message: "Blog not found" });
     }
-    res
-      .status(200)
-      .json({ data: blogData, message: "blog updated successfully" });
+
+    // Step 2: Update the blog
+    const updatedBlogData = await blogModel
+      .findByIdAndUpdate(id, { blogCountry, ...blogDetails }, { new: true })
+      .lean();
+
+    await createNotification("Blog", updatedBlogData, "blogTitle", "updated");
+    if (!updatedBlogData) {
+      return res.status(404).json({ message: "Blog not found after update" });
+    }
+
+    // Step 3: Remove blog from the old country if blogCountry has changed
+    if (existingBlog.blogCountry && existingBlog.blogCountry !== blogCountry) {
+      await countryModel.findByIdAndUpdate(
+        existingBlog.blogCountry,
+        { $pull: { blog: id } }, // Remove the blog from old country
+        { new: true }
+      );
+    }
+
+    // Step 4: Add blog to the new country
+    if (blogCountry) {
+      await countryModel.findByIdAndUpdate(
+        blogCountry,
+        { $addToSet: { blog: id } }, // Prevent duplicates
+        { new: true }
+      );
+    }
+
+    res.status(200).json({
+      data: updatedBlogData,
+      message: "Blog updated successfully and country reference updated!",
+    });
   } catch (err) {
+    console.error("Error updating blog:", err);
     res.status(500).json({ message: err.message });
   }
 };
@@ -172,6 +218,10 @@ const deleteBlog = async (req, res) => {
     if (!deletedblog) {
       return res.status(404).json({ message: "blog not found" });
     }
+    await createNotification("Blog", deletedblog, "blogTitle", "deleted");
+
+    await countryModel.updateMany({ blog: id }, { $pull: { blog: id } });
+
     res.status(200).json({ message: "blog deleted successfully" });
   } catch (err) {
     res.status(500).json({ message: err.message });

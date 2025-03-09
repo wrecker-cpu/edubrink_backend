@@ -30,6 +30,10 @@ const facultySchema = new Schema({
   facultyFeatured: {
     type: Boolean,
   },
+  customURLSlug: {
+    en: { type: String },
+    ar: { type: String },
+  },
 });
 
 module.exports = mongoose.model("Faculty", facultySchema); // Exporting the model

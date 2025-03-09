@@ -12,6 +12,7 @@ const blogSchema = new Schema({
   blogDescription: { en: { type: String }, ar: { type: String } },
   blogAdded: { type: Date, default: Date.now },
   blogPhoto: { type: String },
+  blogCountry: { type: mongoose.Schema.Types.ObjectId, ref: "Country" },
   status: {
     type: String,
     enum: ["Draft", "Pending Review", "Published"],
@@ -38,6 +39,10 @@ const blogSchema = new Schema({
       en: [{ type: String }], // Array of SEO Keywords in English
       ar: [{ type: String }], // Array of SEO Keywords in Arabic
     },
+  },
+  customURLSlug: {
+    en: { type: String },
+    ar: { type: String },
   },
 });
 

@@ -1,12 +1,28 @@
 const blogController = require("../controllers/BlogController");
+const auth = require("../auth/AuthValidation");
 const router = require("express").Router();
 
 // Route for getting, updating, and deleting a user by ID
-router.post("/", blogController.createBlog);
-router.get("/name/:name", blogController.getBlogByName);
-router.put("/:id", blogController.updateBlog);
-router.get("/:id", blogController.getBlogById);
-router.get("/", blogController.getAllBlog);
-router.delete("/:id", blogController.deleteBlog);
+router.post(
+  "/",
+  auth.protect,
+  auth.restrictToEditorAndAdmin,
+  blogController.createBlog
+);
+router.get("/name/:name", auth.protect, blogController.getBlogByName);
+router.put(
+  "/:id",
+  auth.protect,
+  auth.restrictToEditorAndAdmin,
+  blogController.updateBlog
+);
+router.get("/:id", auth.protect, blogController.getBlogById);
+router.get("/", auth.protect, blogController.getAllBlog);
+router.delete(
+  "/:id",
+  auth.protect,
+  auth.restrictToAdmin,
+  blogController.deleteBlog
+);
 
 module.exports = router;

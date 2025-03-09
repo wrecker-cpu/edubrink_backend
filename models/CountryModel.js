@@ -6,7 +6,6 @@ const countrySchema = new Schema({
     en: { type: String, required: true, index: true }, // English name indexed
     ar: { type: String, required: true, index: true },
   },
-  countryStudentPopulation: { type: Number, required: true },
   countryCurrency: { type: String, required: true },
   countryCode: {
     type: String,
@@ -26,17 +25,19 @@ const countrySchema = new Schema({
     ar: { type: String }, // Arabic overview
   },
 
-  metaTitle: {
-    en: { type: String, index: true }, // SEO Meta Title in English
-    ar: { type: String, index: true }, // SEO Meta Title in Arabic
-  },
-  metaDescription: {
-    en: { type: String }, // SEO Meta Description in English
-    ar: { type: String }, // SEO Meta Description in Arabic
-  },
-  metakeywords: {
-    en: [{ type: String }], // Array of SEO Keywords in English
-    ar: [{ type: String }], // Array of SEO Keywords in Arabic
+  seo: {
+    metaTitle: {
+      en: { type: String, index: true },
+      ar: { type: String, index: true },
+    },
+    metaDescription: {
+      en: { type: String },
+      ar: { type: String },
+    },
+    metaKeywords: {
+      en: [{ type: String }], // Array of SEO Keywords in English
+      ar: [{ type: String }], // Array of SEO Keywords in Arabic
+    },
   },
 
   faculty: [
@@ -62,6 +63,10 @@ const countrySchema = new Schema({
   ],
   hotDestination: { type: Boolean },
   livingCost: { type: String },
+  customURLSlug: {
+    en: { type: String },
+    ar: { type: String },
+  },
 });
 
 module.exports = mongoose.model("Country", countrySchema); // Exporting the model

@@ -37,6 +37,7 @@ const majorSchema = new Schema({
     entranceExamRequired: { type: Boolean },
     featuredMajor: { type: Boolean },
   },
+  
 });
 
 module.exports = mongoose.model("Major", majorSchema); // Exporting the model

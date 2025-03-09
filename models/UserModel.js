@@ -11,12 +11,14 @@ const userSchema = new Schema({
     type: Boolean,
     default: false,
   },
+
+  ActionStatus: { type: String },
   passwordChangedAt: {
     type: Date,
     default: null,
   },
   verified: { type: Boolean },
-  Status: { type: Boolean },
+  Status: { type: String },
   createdAt: { type: Date, default: Date.now },
   Address: { type: String },
   MaritalStatus: { type: String, enum: ["Married", "Not-Married"] },

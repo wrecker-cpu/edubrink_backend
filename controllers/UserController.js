@@ -71,8 +71,15 @@ const createUser = async (req, res) => {
 
 const createUserByAdmin = async (req, res) => {
   try {
-    const { Email, Password, FullName, DateOfBirth, isAdmin, Status } =
-      req.body;
+    const {
+      Email,
+      Password,
+      FullName,
+      DateOfBirth,
+      isAdmin,
+      Status,
+      ActionStatus,
+    } = req.body;
 
     // Check if the user already exists
     const existingUser = await userModel.findOne({ Email });
@@ -93,6 +100,7 @@ const createUserByAdmin = async (req, res) => {
       passwordChangedAt: Date.now(),
       verified: true, // Admin-created users are verified by default
       Status: Status || false,
+      ActionStatus
     };
 
     // Save the user

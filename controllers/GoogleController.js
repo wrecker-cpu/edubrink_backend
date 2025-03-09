@@ -13,7 +13,6 @@ const googleLogin = async (req, res) => {
       `https://www.googleapis.com/oauth2/v1/userinfo?alt=json&access_token=${googleRes.tokens.access_token}`
     );
     const { email, name, picture } = userRes.data;
-    // console.log(userRes);
     let user = await userModel.findOne({ Email: email });
 
     if (!user) {

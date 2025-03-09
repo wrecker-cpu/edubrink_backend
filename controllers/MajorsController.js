@@ -1,6 +1,7 @@
 const NodeCache = require("node-cache");
 const MajorsModel = require("../models/MajorsModel");
 const FacultyModel = require("../models/FacultyModel");
+const { createNotification } = require("../controllers/HelperController");
 
 // Create a new Majors
 const createMajors = async (req, res) => {
@@ -10,6 +11,8 @@ const createMajors = async (req, res) => {
     // Step 1: Create a new major
     const newMajor = new MajorsModel(majorDetails);
     await newMajor.save();
+
+    await createNotification("Major", newMajor, "majorName", "created");
 
     // Step 2: If a faculty is provided, add the major ID to the faculty's major array
     if (faculty) {
@@ -104,6 +107,8 @@ const updateMajors = async (req, res) => {
       new: true,
     }).lean();
 
+    await createNotification("Major", updatedMajor, "majorName", "updated");
+
     res.status(200).json({
       data: updatedMajor,
       message: "Major updated successfully with faculty reference!",
@@ -131,7 +136,9 @@ const deleteMajors = async (req, res) => {
     }
 
     // Step 3: Delete the major
-    await MajorsModel.findByIdAndDelete(id);
+    const deletedMajor = await MajorsModel.findByIdAndDelete(id);
+
+    await createNotification("Major", deletedMajor, "majorName", "deleted");
 
     res.status(200).json({
       message: "Major deleted successfully and removed from faculty!",

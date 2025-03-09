@@ -47,41 +47,26 @@ const universitySchema = new Schema({
   entranceExamRequired: {
     type: Boolean,
   },
-  studyLevel: [
-    {
-      type: String,
-    },
-  ],
-  uniLocation: {
-    uniAddress: {
-      en: { type: String, required: true }, // English address
-      ar: { type: String, required: true }, // Arabic address
-    },
-    uniPincode: { type: String, required: true },
-    uniCity: {
-      en: { type: String, required: true },
-      ar: { type: String, required: true },
-    },
-    uniState: {
-      en: { type: String, required: true },
-      ar: { type: String, required: true },
-    },
-    uniCountry: {
-      en: { type: String, required: true },
-      ar: { type: String, required: true },
-    },
+
+  uniCountry: {
+    type: Schema.Types.ObjectId,
+    ref: "Country",
   },
+
   campuses: [
     {
       campusName: { en: { type: String }, ar: { type: String } },
       campusLocation: {
-        uniAddress: { en: { type: String }, ar: { type: String } },
-        uniPincode: { type: String },
         uniCity: { en: { type: String }, ar: { type: String } },
-        uniState: { en: { type: String }, ar: { type: String } },
-        uniCountry: { en: { type: String }, ar: { type: String } },
+        uniDescription: { en: { type: String }, ar: { type: String } },
       },
       campusFacilities: [{ type: String }],
+    },
+  ],
+  faq: [
+    {
+      faqQuestions: { en: { type: String }, ar: { type: String } },
+      faqAnswers: { en: { type: String }, ar: { type: String } },
     },
   ],
   seo: {
@@ -141,6 +126,10 @@ const universitySchema = new Schema({
       en: { type: String },
       ar: { type: String },
     },
+  },
+  customURLSlug: {
+    en: { type: String },
+    ar: { type: String },
   },
 });
 

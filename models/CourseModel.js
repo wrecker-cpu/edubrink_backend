@@ -47,6 +47,10 @@ const courseSchema = new Schema({
       ar: [{ type: String }], // Array of SEO Keywords in Arabic
     },
   },
+  customURLSlug: {
+    en: { type: String },
+    ar: { type: String },
+  },
 });
 
 module.exports = mongoose.model("Course", courseSchema); //exporting the model

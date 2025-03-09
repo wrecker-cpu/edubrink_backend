@@ -2,15 +2,18 @@ const NodeCache = require("node-cache");
 const FacultyModel = require("../models/FacultyModel");
 const UniversityModel = require("../models/UniversityModel");
 const MajorModel = require("../models/MajorsModel");
+const { createNotification } = require("../controllers/HelperController");
 
 // Create a new Faculty
 const createFaculty = async (req, res) => {
   try {
-    const { universities, major, ...facultyDetails } = req.body; // Extract university & major IDs
+    const { universities, ...facultyDetails } = req.body; // Extract university & major IDs
 
     // Step 1: Create the faculty
     const newFaculty = new FacultyModel(facultyDetails);
     await newFaculty.save();
+
+    await createNotification("Faculty", newFaculty, "facultyName", "created");
 
     // Step 2: If universities are provided, update references
     if (universities) {
@@ -21,16 +24,6 @@ const createFaculty = async (req, res) => {
       );
 
       newFaculty.universities = universities; // Assign university to faculty
-    }
-
-    // Step 3: If majors are provided, update MajorModel to reference the new faculty
-    if (major && major.length > 0) {
-      await MajorModel.updateMany(
-        { _id: { $in: major } }, // Find all matching major IDs
-        { $set: { faculty: newFaculty._id } } // Update the faculty field (not an array)
-      );
-
-      newFaculty.major = major; // Assign majors to faculty
     }
 
     // Step 4: Save updated faculty data
@@ -65,7 +58,9 @@ const getFacultyById = async (req, res) => {
 
 const getAllFaculty = async (req, res) => {
   try {
-    const Faculty = await FacultyModel.find().populate("universities major").lean();
+    const Faculty = await FacultyModel.find()
+      .populate("universities major")
+      .lean();
 
     res.status(200).json({ data: Faculty });
   } catch (err) {
@@ -154,6 +149,13 @@ const updateFaculty = async (req, res) => {
       { new: true }
     ).lean();
 
+    await createNotification(
+      "Faculty",
+      updatedFaculty,
+      "facultyName",
+      "updated"
+    );
+
     res.status(200).json({
       data: updatedFaculty,
       message: "Faculty updated successfully with universities and majors!",
@@ -171,6 +173,13 @@ const deleteFaculty = async (req, res) => {
     if (!deletedFaculty) {
       return res.status(404).json({ message: "Faculty not found" });
     }
+
+    await createNotification(
+      "Faculty",
+      deletedFaculty,
+      "facultyName",
+      "deleted"
+    );
 
     // Step 2: Remove faculty ID from all universities that reference it
     await UniversityModel.updateMany(

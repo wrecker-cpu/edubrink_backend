@@ -27,7 +27,6 @@ const protect = async (req, res, next) => {
 
     // Verifying the token
     const decode = await promisify(jwt.verify)(token, jwtSecret);
-    console.log(decode);
 
     // Find the user based on the decoded ID
     const freshUser = await userModel.findById(decode.id);
@@ -56,6 +55,17 @@ const protect = async (req, res, next) => {
       stack: err.stack,
     });
   }
+};
+
+const restrictToEditorAndAdmin = (req, res, next) => {
+  // Check if the user is an admin
+  if (!req.user || (!req.user.isAdmin && req.user.ActionStatus !== "Editor")) {
+    return res.status(401).json({
+      message: "You do not have the permissions to perform this action",
+    });
+  }
+
+  next(); // If the user is an admin, proceed to the next middleware or route handler
 };
 
 const restrictToAdmin = (req, res, next) => {
@@ -103,4 +113,5 @@ module.exports = {
   protect,
   restrictToAdmin,
   createSendToken,
+  restrictToEditorAndAdmin,
 };

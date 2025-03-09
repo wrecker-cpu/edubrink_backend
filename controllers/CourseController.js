@@ -1,13 +1,31 @@
 const courseModel = require("../models/CourseModel");
+const universityModel = require("../models/UniversityModel");
 const mongoose = require("mongoose");
+const { createNotification } = require("../controllers/HelperController");
 
 const createCourse = async (req, res) => {
   try {
-    const courseData = new courseModel(req.body);
-    await courseData.save();
-    res
-      .status(201)
-      .json({ data: courseData, message: "course created successfully" });
+    const { university, ...courseDetails } = req.body;
+
+    // Create the course
+    const newCourse = new courseModel(courseDetails);
+    await newCourse.save();
+
+    await createNotification("Course", newCourse, "CourseName", "created");
+
+    // Add course ID to the university model
+    if (university) {
+      await universityModel.findByIdAndUpdate(
+        university,
+        { $push: { courseId: newCourse._id } },
+        { new: true }
+      );
+    }
+
+    res.status(201).json({
+      data: newCourse,
+      message: "Course created successfully and linked to university!",
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -34,50 +52,16 @@ const getCourseById = async (req, res) => {
         .json({ message: "Provide either a valid ID or a course name" });
     }
 
-    const courseData = await courseModel.aggregate([
-      { $match: matchCondition },
-      {
-        $lookup: {
-          from: "universities",
-          localField: "_id",
-          foreignField: "courseId",
-          as: "university",
-        },
-      },
-      { $unwind: { path: "$university", preserveNullAndEmptyArrays: true } },
-      {
-        $project: {
-          CourseName: 1,
-          CourseDescription: 1,
-          CourseDuration: 1,
-          DeadLine: 1,
-          CourseFees: 1,
-          ModeOfStudy: 1,
-          StudyLevel: 1,
-          Languages: 1,
-          scholarshipsAvailable: 1,
-          scholarshipType: 1, // ✅ Added missing field
-          scholarshipPercentage: 1, // ✅ Added missing field
-          DiscountAvailable: 1,
-          DiscountValue: 1, // ✅ Added missing field
-          MostPopular: 1,
-          Requirements: 1,
-          CourseCategory: 1, // ✅ Added missing field
-          provider: 1, // ✅ Added missing field
-          seo: 1, // ✅ Include the entire SEO object
-          Tags: 1,
-          university: 1,
-          uniName: "$university.uniName",
-          uniSymbol: "$university.uniSymbol",
-        },
-      },
-    ]);
+    // Find course and populate university field
+    const courseData = await courseModel
+      .findOne(matchCondition)
+      .populate("university");
 
-    if (!courseData || courseData.length === 0) {
+    if (!courseData) {
       return res.status(404).json({ message: "Course not found" });
     }
 
-    res.status(200).json({ data: courseData[0] });
+    res.status(200).json({ data: courseData });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -88,10 +72,7 @@ const getAllCourses = async (req, res) => {
     // Check if the `all` query parameter is set to true
     if (req.query.all === "true") {
       // Fetch all courses without limit or skip
-      const courses = await courseModel
-        .find()
-        .populate("Tags university")
-        .lean();
+      const courses = await courseModel.find().populate("university").lean();
       return res.status(200).json({ data: courses });
     }
 
@@ -102,7 +83,7 @@ const getAllCourses = async (req, res) => {
 
     const courses = await courseModel
       .find()
-      .populate("Tags university")
+      .populate("university")
       .skip(skip)
       .limit(limit)
       .lean();
@@ -220,18 +201,51 @@ const getAllCoursesWithUniNames = async (req, res) => {
 // };
 
 // Update a course by ID
+
 const updateCourse = async (req, res) => {
   const id = req.params.id;
   try {
-    const courseData = await courseModel
-      .findByIdAndUpdate(id, req.body, { new: true })
-      .lean();
-    if (!courseData) {
-      return res.status(404).json({ message: "course not found" });
+    const { university, ...courseDetails } = req.body;
+
+    // Find the existing course before updating
+    const existingCourse = await courseModel.findById(id);
+    if (!existingCourse) {
+      return res.status(404).json({ message: "Course not found" });
     }
-    res
-      .status(200)
-      .json({ data: courseData, message: "course updated successfully" });
+
+    // Include the university field in the update operation
+    const updatedCourse = await courseModel
+      .findByIdAndUpdate(id, { ...courseDetails, university }, { new: true })
+      .lean();
+
+    await createNotification("Course", updatedCourse, "CourseName", "updated");
+
+    if (!updatedCourse) {
+      return res.status(404).json({ message: "Course not found" });
+    }
+
+    // If university ID has changed or was removed, update references
+    if (
+      existingCourse.university &&
+      existingCourse.university.toString() !== university
+    ) {
+      // Remove course ID from the old university
+      await universityModel.findByIdAndUpdate(existingCourse.university, {
+        $pull: { courseId: id },
+      });
+    }
+
+    // Add course ID to the new university (if universityId is provided)
+    if (university) {
+      await universityModel.findByIdAndUpdate(university, {
+        $addToSet: { courseId: updatedCourse._id },
+      });
+    }
+
+    res.status(200).json({
+      data: updatedCourse,
+      message: "Course updated successfully and university reference updated!",
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -241,11 +255,23 @@ const updateCourse = async (req, res) => {
 const deleteCourse = async (req, res) => {
   const id = req.params.id;
   try {
-    const deletedcourse = await courseModel.findByIdAndDelete(id);
-    if (!deletedcourse) {
-      return res.status(404).json({ message: "course not found" });
+    // Find and delete the course
+    const deletedCourse = await courseModel.findByIdAndDelete(id);
+    if (!deletedCourse) {
+      return res.status(404).json({ message: "Course not found" });
     }
-    res.status(200).json({ message: "course deleted successfully" });
+
+    await createNotification("Course", deletedCourse, "CourseName", "deleted");
+
+    // Remove course ID from the university model
+    await universityModel.updateMany(
+      { courseId: id },
+      { $pull: { courseId: id } }
+    );
+
+    res.status(200).json({
+      message: "Course deleted successfully and removed from universities!",
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

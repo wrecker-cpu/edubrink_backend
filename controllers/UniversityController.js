@@ -1,36 +1,37 @@
 const universityModel = require("../models/UniversityModel");
-const facultyModel = require("../models/FacultyModel");
+const countryModel = require("../models/CountryModel");
+const courseModel = require("../models/CourseModel");
+const FacultyModel = require("../models/FacultyModel");
+const { createNotification } = require("../controllers/HelperController");
 
 // Create a new University
 const createUniversity = async (req, res) => {
   try {
-    const { faculty, ...universityDetails } = req.body; // Extract faculty IDs if provided
+    const { uniCountry, ...uniDetails } = req.body;
 
-    // Step 1: Create the university
-    const newUniversity = new universityModel(universityDetails);
+    // Create the university
+    const newUniversity = new universityModel(uniDetails);
     await newUniversity.save();
 
-    // Step 2: If faculties are provided, update them with university reference
-    if (faculty && faculty.length > 0) {
-      await facultyModel.updateMany(
-        { _id: { $in: faculty } }, // Find faculties by IDs
-        { $set: { university: newUniversity._id } } // Update them with the new university ID
-      );
+    await createNotification("University", newUniversity, "uniName", "created");
 
-      // Step 3: Add faculty IDs to the university's faculty array
-      newUniversity.faculty = faculty;
-      await newUniversity.save();
+    // Update the country model with the new university ID
+    if (uniCountry) {
+      await countryModel.findByIdAndUpdate(
+        uniCountry,
+        { $push: { universities: newUniversity._id } },
+        { new: true }
+      );
     }
 
     res.status(201).json({
       data: newUniversity,
-      message: "University created successfully with faculties updated!",
+      message: "University created successfully and linked to country!",
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
-
 // Read (Get) a University by ID
 const getUniversityById = async (req, res) => {
   const id = req.params.id;
@@ -38,7 +39,7 @@ const getUniversityById = async (req, res) => {
     const universityData = await universityModel
       .findById(id)
       .lean()
-      .populate("courseId faculty");
+      .populate("courseId faculty uniCountry");
     if (!universityData) {
       return res.status(404).json({ message: "University not found" });
     }
@@ -404,41 +405,49 @@ const getUniversitiesLimitedQuery = async (req, res) => {
 const updateUniversity = async (req, res) => {
   const id = req.params.id;
   try {
-    const { faculty, ...universityDetails } = req.body; // Extract faculty array
+    const { uniCountry, courseId, faculty, ...universityDetails } = req.body;
 
-    // Step 1: Find the existing university
-    const existingUniversity = await universityModel.findById(id);
-    if (!existingUniversity) {
+    // Step 1: Find and update the university
+    const updatedUniversity = await universityModel
+      .findByIdAndUpdate(
+        id,
+        { ...universityDetails, courseId, faculty, uniCountry },
+        { new: true }
+      )
+      .lean();
+
+    if (!updatedUniversity) {
       return res.status(404).json({ message: "University not found" });
     }
 
-    // Step 2: Find faculties that were removed
-    const removedFaculties = existingUniversity.faculty.filter(
-      (facultyId) => !faculty.includes(facultyId.toString())
-    );
+    await createNotification("University", updatedUniversity, "uniName", "updated");
 
-    // Step 3: Unset the university reference from removed faculties
-    if (removedFaculties.length > 0) {
-      await facultyModel.updateMany(
-        { _id: { $in: removedFaculties } }, // Faculties removed from the university
-        { $unset: { universities: "" } } // Remove their university reference
+    // Step 2: If uniCountry is provided, update the Country model
+    if (uniCountry) {
+      await countryModel.findByIdAndUpdate(
+        uniCountry,
+        { $addToSet: { universities: updatedUniversity._id } },
+        { new: true }
       );
     }
 
-    // Step 4: Set the university reference for newly added faculties
-    await facultyModel.updateMany(
-      { _id: { $in: faculty } }, // Faculties in the updated list
-      { $set: { universities: id } }
-    );
+    if (faculty) {
+      await FacultyModel.updateMany(
+        { universities: id, _id: { $nin: faculty } },
+        { $unset: { universities: "" } }
+      );
+    }
 
-    // Step 5: Update the university with the new faculty list
-    const updatedUniversity = await universityModel
-      .findByIdAndUpdate(id, { ...universityDetails, faculty }, { new: true })
-      .lean();
+    if (courseId) {
+      await courseModel.updateMany(
+        { university: id, _id: { $nin: courseId } },
+        { $unset: { university: "" } }
+      );
+    }
 
     res.status(200).json({
       data: updatedUniversity,
-      message: "University updated successfully with faculties!",
+      message: "University updated successfully and linked to country!",
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -446,23 +455,31 @@ const updateUniversity = async (req, res) => {
 };
 
 // Delete a University by ID
+
 const deleteUniversity = async (req, res) => {
   const id = req.params.id;
   try {
-    // Step 1: Find the university to check if it exists before deleting
+    // Step 1: Find and delete the university
     const deletedUniversity = await universityModel.findByIdAndDelete(id);
     if (!deletedUniversity) {
       return res.status(404).json({ message: "University not found" });
     }
 
-    // Step 2: Remove university ID from all faculties that reference it
-    await facultyModel.updateMany(
+    await createNotification("University", deletedUniversity, "uniName", "deleted");
+
+    // Step 2: Remove the university reference from the country model
+    await countryModel.updateMany(
       { universities: id },
       { $pull: { universities: id } }
     );
 
+    await FacultyModel.updateMany(
+      { universities: id },
+      { $pull: { universities: id } } // Correctly removes the university ID from the array
+    );
+
     res.status(200).json({
-      message: "University deleted successfully and removed from faculties!",
+      message: "University deleted successfully and removed from country!",
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
