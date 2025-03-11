@@ -4,7 +4,12 @@ const Schema = mongoose.Schema; //creation object of schema class
 const courseSchema = new Schema({
   CourseName: { en: { type: String }, ar: { type: String } },
   CourseDescription: { en: { type: String }, ar: { type: String } },
-  CourseDuration: { type: String },
+  CourseDuration: {
+    type: Number,
+  },
+  CourseDurationUnits: {
+    type: String,
+  },
   CourseStartDate: { type: Date },
   CourseType: { type: String },
   Languages: [{ type: String }],

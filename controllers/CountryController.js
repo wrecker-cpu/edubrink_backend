@@ -3,6 +3,7 @@ const { Readable } = require("stream");
 const NodeCache = require("node-cache");
 const countryModel = require("../models/CountryModel");
 const universityModel = require("../models/UniversityModel");
+const courseModel = require("../models/CourseModel");
 const BlogModel = require("../models/BlogModel");
 const { createNotification } = require("../controllers/HelperController");
 const cache = new NodeCache({ stdTTL: 300, checkperiod: 320 }); // 5 min TTL
@@ -213,7 +214,7 @@ const getFullDepthData = async (req, res) => {
     const result = await countryModel.aggregate([
       {
         $lookup: {
-          from: "universities", // Lookup universities based on IDs in the universities array
+          from: "universities",
           localField: "universities",
           foreignField: "_id",
           as: "universities",
@@ -230,7 +231,7 @@ const getFullDepthData = async (req, res) => {
           from: "courses", // Lookup courses based on IDs in the courseId array
           localField: "universities.courseId",
           foreignField: "_id",
-          as: "universities.courseId",
+          as: "universities.courses",
           pipeline: [
             {
               $project: {
@@ -287,6 +288,22 @@ const getFullDepthData = async (req, res) => {
               },
             },
           },
+          blog: {
+            $map: {
+              input: "$blog",
+              as: "blogItem",
+              in: {
+                $mergeObjects: [
+                  "$$blogItem",
+                  {
+                    countryName: "$countryName",
+                    countryPhotos: "$countryPhotos",
+                    countryCode: "$countryCode",
+                  },
+                ],
+              },
+            },
+          },
         },
       },
       {
@@ -299,20 +316,9 @@ const getFullDepthData = async (req, res) => {
           countryLanguages: 1,
           universities: 1,
           blog: 1, // Fully populated blog
-          totalUniversities: { $size: "$universities" }, // Count universities
-          totalCourses: {
-            $sum: {
-              $map: {
-                input: "$universities",
-                as: "university",
-                in: { $size: { $ifNull: ["$$university.courseId", []] } }, // Count courses per university
-              },
-            },
-          },
-          totalBlogs: { $size: "$blog" }, // Count blogs
         },
       },
-    ]); // Your aggregation logic
+    ]);
 
     if (!result || result.length === 0) {
       return res.status(404).json({ message: "No data found" });
@@ -320,22 +326,6 @@ const getFullDepthData = async (req, res) => {
 
     const responseData = JSON.stringify({
       data: result,
-      // countriesCount: result.length,
-      // universitiesCount: result.reduce(
-      //   (acc, country) => acc + country.universities.length,
-      //   0
-      // ),
-      // coursesCount: result.reduce(
-      //   (acc, country) =>
-      //     acc +
-      //     country.universities.reduce(
-      //       (courseAcc, university) =>
-      //         courseAcc + (university.courseId?.length || 0),
-      //       0
-      //     ),
-      //   0
-      // ),
-      // blogCount: result.reduce((acc, country) => acc + country.blog.length, 0),
     });
 
     // Select the best compression algorithm based on client request
@@ -351,6 +341,196 @@ const getFullDepthData = async (req, res) => {
     } else {
       res.send(responseData); // Send without compression if client doesn't support Brotli or Gzip
     }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const getFullDepthDataByFilter = async (req, res) => {
+  try {
+    let filterProp = {};
+
+    // Parse filterProp from query
+    if (req.query.filterProp) {
+      try {
+        const decodedFilter = decodeURIComponent(req.query.filterProp);
+        filterProp = JSON.parse(decodedFilter);
+      } catch (error) {
+        console.error("Error parsing filterProp:", error.message);
+      }
+    }
+
+    // Step 1: Fetch Countries
+    const countryFilter = filterProp.Destination
+      ? { "countryName.en": { $in: filterProp.Destination } }
+      : {};
+
+    const countries = await countryModel
+      .find(countryFilter)
+      .populate({
+        path: "blog", // Populate blog field
+        model: "Blog",
+        select:
+          "blogTitle blogSubtitle blogAuthor blogCategory blogPhoto blogTags status", // Select only required fields
+      })
+      .select("_id countryName countryPhotos countryCode blog"); // Select required fields from Country
+
+    if (!countries.length)
+      return res.status(404).json({ message: "No countries found" });
+
+    const countryIds = countries.map((c) => c._id);
+
+    // Step 2: Fetch Universities
+    const universityFilter = { uniCountry: { $in: countryIds } };
+    if (filterProp.StudyLevel && filterProp.StudyLevel !== "All")
+      universityFilter.studyLevel = { $in: [filterProp.StudyLevel] };
+    if (filterProp.EntranceExam)
+      universityFilter.entranceExamRequired = filterProp.EntranceExam;
+
+    if (filterProp.UniType) universityFilter.uniType = filterProp.UniType;
+
+    if (filterProp.IntakeYear)
+      universityFilter.inTakeYear = filterProp.IntakeYear;
+
+    if (filterProp.IntakeMonth)
+      universityFilter.inTakeMonth = filterProp.IntakeMonth;
+
+    const universities = await universityModel.find(
+      universityFilter,
+
+      "_id uniCountry uniName uniType studyLevel uniTutionFees uniFeatured uniDiscount entranceExamRequired scholarshipAvailability entranceExamRequired inTakeMonth inTakeYear"
+    );
+
+    if (!universities.length)
+      return res.status(404).json({ message: "No universities found" });
+
+    const universityIds = universities.map((u) => u._id);
+
+    // Step 3: Fetch Courses
+    const courseFilter = { university: { $in: universityIds } };
+    if (filterProp.minBudget || filterProp.maxBudget) {
+      courseFilter.CourseFees = {
+        $gte: Number(filterProp.minBudget) || 0,
+        $lte: Number(filterProp.maxBudget) || Infinity,
+      };
+    }
+    if (filterProp["ModeOfStudy"]) {
+      courseFilter.$or = [
+        { "ModeOfStudy.en": filterProp["ModeOfStudy"] },
+        { "ModeOfStudy.ar": filterProp["ModeOfStudy"] },
+      ];
+    }
+    if (
+      (filterProp["searchQuery.en"] &&
+        filterProp["searchQuery.en"].trim() !== "") ||
+      (filterProp["searchQuery.ar"] &&
+        filterProp["searchQuery.ar"].trim() !== "")
+    ) {
+      courseFilter.$or = [];
+
+      if (
+        filterProp["searchQuery.en"] &&
+        filterProp["searchQuery.en"].trim() !== ""
+      ) {
+        courseFilter.$or.push({
+          "Tags.en": { $in: [filterProp["searchQuery.en"]] },
+        });
+      }
+
+      if (
+        filterProp["searchQuery.ar"] &&
+        filterProp["searchQuery.ar"].trim() !== ""
+      ) {
+        courseFilter.$or.push({
+          "Tags.ar": { $in: [filterProp["searchQuery.ar"]] },
+        });
+      }
+    }
+    if (
+      (filterProp.searchQuery?.en && filterProp.searchQuery.en.trim() !== "") ||
+      (filterProp.searchQuery?.ar && filterProp.searchQuery.ar.trim() !== "")
+    ) {
+      courseFilter.$or = [];
+
+      if (
+        filterProp.searchQuery.en &&
+        filterProp.searchQuery.en.trim() !== ""
+      ) {
+        courseFilter.$or.push({
+          "Tags.en": { $in: [filterProp.searchQuery.en] },
+        });
+      }
+
+      if (
+        filterProp.searchQuery.ar &&
+        filterProp.searchQuery.ar.trim() !== ""
+      ) {
+        courseFilter.$or.push({
+          "Tags.ar": { $in: [filterProp.searchQuery.ar] },
+        });
+      }
+    }
+
+    if (filterProp.CourseDuration) {
+      let [min, max] = filterProp.CourseDuration.split("-").map(Number);
+
+      if (max === undefined) {
+        max = Infinity; // Handle "60+" case
+      }
+
+      // Convert all durations to months before filtering
+      courseFilter.$or = [
+        {
+          CourseDurationUnits: "Years",
+          CourseDuration: { $gte: min / 12, $lte: max / 12 },
+        },
+        {
+          CourseDurationUnits: "Months",
+          CourseDuration: { $gte: min, $lte: max },
+        },
+        {
+          CourseDurationUnits: "Weeks",
+          CourseDuration: { $gte: min / 0.23, $lte: max / 0.23 },
+        },
+      ];
+    }
+
+    const courses = await courseModel.find(
+      courseFilter,
+      "CourseName CourseFees CourseDuration CourseDurationUnits ModeOfStudy Tags university"
+    );
+
+    // Create a map of universities with their courses
+    const universityMap = universities.reduce((acc, uni) => {
+      if (uni) {
+        acc[uni._id.toString()] = { ...uni.toObject(), courses: [] };
+      }
+      return acc;
+    }, {});
+
+    // Assign courses to their respective universities
+    courses.forEach((course) => {
+      if (course && universityMap[course.university.toString()]) {
+        universityMap[course.university.toString()].courses.push(course);
+      }
+    });
+
+    // Construct the final response
+    const countryData = countries.map((country) => {
+      if (!country) return null; // Skip if country is undefined
+
+      return {
+        ...country.toObject(),
+        universities: universities
+          .filter((uni) => uni && uni.uniCountry.toString() === country._id.toString())
+          .map((uni) => ({
+            ...uni.toObject(),
+            courseId: universityMap[uni._id.toString()]?.courses || [],
+          })),
+      };
+    }).filter(Boolean); // Remove null values
+
+    res.status(200).json({ data: countryData });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -455,4 +635,5 @@ module.exports = {
   deleteCountry,
   getCountryByName,
   getFullDepthData,
+  getFullDepthDataByFilter,
 };
