@@ -59,15 +59,17 @@ const getUniversityByName = async (req, res) => {
           $or: [
             { "uniName.en": { $regex: name, $options: "i" } }, // Case-insensitive search in English name
             { "uniName.ar": { $regex: name, $options: "i" } }, // Case-insensitive search in Arabic name
+            { "customURLSlug.en": { $regex: name, $options: "i" } },
+            { "customURLSlug.ar": { $regex: name, $options: "i" } },
           ],
         },
       },
-      // Lookup country data by matching universities' ids in the country's universities array
+      // Lookup country data using `uniCountry` field
       {
         $lookup: {
           from: "countries", // The countries collection
-          localField: "_id", // The university _id
-          foreignField: "universities", // Match with university _id in Country
+          localField: "uniCountry", // The `uniCountry` field in University model
+          foreignField: "_id", // Match with `_id` in Country collection
           as: "country", // This will store country data in the "country" array
         },
       },
@@ -94,25 +96,14 @@ const getUniversityByName = async (req, res) => {
           localField: "courseId", // The field in University model containing course IDs
           foreignField: "_id", // Match with Course _id
           as: "courses", // Store populated courses in "courses"
-          pipeline: [
-            {
-              $lookup: {
-                from: "tags", // The tags collection
-                localField: "Tags", // Field in Course model referencing Tags
-                foreignField: "_id", // Match with _id in Tags collection
-                as: "Tags", // Populate Tags field
-              },
-            },
-            {
-              $project: {
-                CourseName: 1,
-                ModeOfStudy: 1,
-                DeadLine: 1,
-                CourseFees: 1,
-                Tags: 1, // Include populated Tags field
-              },
-            },
-          ],
+        },
+      },
+      {
+        $lookup: {
+          from: "faculties", // The courses collection
+          localField: "faculty", // The field in University model containing course IDs
+          foreignField: "_id", // Match with Course _id
+          as: "faculties", // Store populated courses in "courses"
         },
       },
       {
@@ -123,6 +114,9 @@ const getUniversityByName = async (req, res) => {
           scholarshipAvailability: 1,
           uniDiscount: 1,
           uniMainImage: 1,
+          courses: 1,
+          faculties: 1,
+          campuses: 1,
           uniDeadline: 1,
           uniDuration: 1,
           uniStartDate: 1,
@@ -420,7 +414,12 @@ const updateUniversity = async (req, res) => {
       return res.status(404).json({ message: "University not found" });
     }
 
-    await createNotification("University", updatedUniversity, "uniName", "updated");
+    await createNotification(
+      "University",
+      updatedUniversity,
+      "uniName",
+      "updated"
+    );
 
     // Step 2: If uniCountry is provided, update the Country model
     if (uniCountry) {
@@ -465,7 +464,12 @@ const deleteUniversity = async (req, res) => {
       return res.status(404).json({ message: "University not found" });
     }
 
-    await createNotification("University", deletedUniversity, "uniName", "deleted");
+    await createNotification(
+      "University",
+      deletedUniversity,
+      "uniName",
+      "deleted"
+    );
 
     // Step 2: Remove the university reference from the country model
     await countryModel.updateMany(

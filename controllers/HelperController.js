@@ -8,9 +8,7 @@ const UniversityModel = require("../models/UniversityModel");
 const CountryModel = require("../models/CountryModel");
 const notificationModel = require("../models/NotificationModel");
 const UserModel = require("../models/UserModel"); // Import UserModel
-
-// Initialize cache (TTL: 10 minutes)
-const cache = new NodeCache({ stdTTL: 600, checkperiod: 620 });
+const cache = new NodeCache({ stdTTL: 300, checkperiod: 320 }); // 5 min TTL
 
 const getAllDropdownData = async (req, res) => {
   try {
@@ -114,9 +112,6 @@ const createNotification = async (category, itemData, field, action) => {
 
     // Save notification
     await notification.save();
-    console.log(
-      `Notification created: ${category} ${action} - ${itemData._id}`
-    );
   } catch (error) {
     console.error("Error creating notification:", error.message);
   }
@@ -147,9 +142,15 @@ const updateAllNotification = async (req, res) => {
       modifiedCount: result.modifiedCount, // Number of documents updated
     });
   } catch (error) {
-    res.status(500).json({ message: "Error updating notifications", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Error updating notifications", error: error.message });
   }
 };
 
-
-module.exports = { getAllDropdownData, createNotification, getAllNotification,updateAllNotification };
+module.exports = {
+  getAllDropdownData,
+  createNotification,
+  getAllNotification,
+  updateAllNotification,
+};

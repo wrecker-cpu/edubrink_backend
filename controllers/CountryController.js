@@ -171,11 +171,18 @@ const getAllCountriesByQuery = async (req, res) => {
 };
 
 const getCountryByName = async (req, res) => {
-  const name = req.params.name; // Assume 'name' is passed as a route parameter
+  const name = req.params.name;
   try {
     // Find the country by name
     const countryData = await countryModel
-      .findOne({ "countryName.en": name })
+      .findOne({
+        $or: [
+          { "customURLSlug.en": name },
+          { "customURLSlug.ar": name },
+          { "countryName.en": name },
+          { "countryName.ar": name },
+        ],
+      })
       .populate({
         path: "universities",
         select: "courseId uniName scholarshipAvailability uniTutionFees",

@@ -54,32 +54,15 @@ const getAllBlog = async (req, res) => {
       {
         $lookup: {
           from: "countries", // Name of the Country collection
-          localField: "_id", // Field in Blog schema to match
-          foreignField: "blog", // Field in Country schema to match
-          as: "countries", // Output array name
+          localField: "blogCountry", // Field in Blog schema (stores country ID)
+          foreignField: "_id", // Field in Country schema (Primary Key)
+          as: "blogCountry", // Renaming output array to blogCountry
         },
       },
       {
-        $group: {
-          _id: "$_id", // Group by blog ID
-          blogTitle: { $first: "$blogTitle" },
-          blogSubtitle: { $first: "$blogSubtitle" },
-          blogDescription: { $first: "$blogDescription" },
-          blogAdded: { $first: "$blogAdded" },
-          blogPhoto: { $first: "$blogPhoto" },
-          blogRelated: { $first: "$blogRelated" },
-          blogAuthor: { $first: "$blogAuthor" },
-          blogCategory: { $first: "$blogCategory" },
-          publishImmediately: { $first: "$publishImmediately" },
-          featuredBlog: { $first: "$featuredBlog" },
-          blogTags: { $first: "$blogTags" },
-          countries: {
-            $push: {
-              countryName: "$countries.countryName",
-              countryPopulation: "$countries.countryStudentPopulation",
-              countryCurrency: "$countries.countryCurrency",
-            },
-          }, // Keep each country as a separate object inside an array
+        $unwind: {
+          path: "$blogCountry",
+          preserveNullAndEmptyArrays: true, // Keep blogs even if no country is found
         },
       },
       {
@@ -96,7 +79,10 @@ const getAllBlog = async (req, res) => {
           publishImmediately: 1,
           featuredBlog: 1,
           blogTags: 1,
-          countries: 1, // Separate countries inside an array
+          customURLSlug: 1,
+          "blogCountry._id": 1,
+          "blogCountry.countryName": 1,
+          "blogCountry.countryCurrency": 1,
         },
       },
     ]);
@@ -120,37 +106,30 @@ const getAllBlog = async (req, res) => {
   }
 };
 
+
+
 const getBlogByName = async (req, res) => {
-  const name = req.params.name; // Assume 'name' is passed as a route parameter
-  const country = req.query.country; // Country is passed in the query parameters
+  const name = req.params.name;
 
   try {
     // Find the blog by either blogTitle.en or blogTitle.ar
     const blogData = await blogModel
       .findOne({
-        $or: [{ "blogTitle.en": name }, { "blogTitle.ar": name }],
+        $or: [
+          { "blogTitle.en": name },
+          { "blogTitle.ar": name },
+          { "customURLSlug.en": name },
+          { "customURLSlug.ar": name },
+        ],
+      })
+      .populate({
+        path: "blogCountry",
+        populate: "blog",
       })
       .lean();
 
     if (!blogData) {
       return res.status(404).json({ message: "Blog not found" });
-    }
-
-    // If a country is passed in the query, check if it exists in the Country model
-    if (country) {
-      const countryData = await countryModel
-        .findOne({
-          $or: [{ "countryName.en": country }, { "countryName.ar": country }],
-        })
-        .select("blog countryName")
-        .populate("blog", "_id blogTitle blogAdded blogPhoto "); // Populate related blogs if the country exists
-
-      if (countryData) {
-        // If country is found, include country data and populated blogs in the response
-        return res.status(200).json({ data: { ...blogData, countryData } });
-      } else {
-        return res.status(404).json({ message: "Country not found" });
-      }
     }
 
     // If no country is passed, just return the blog data

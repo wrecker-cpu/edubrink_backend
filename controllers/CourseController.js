@@ -44,7 +44,12 @@ const getCourseById = async (req, res) => {
     // If 'id' is not valid, try matching by course name
     else if (name) {
       matchCondition = {
-        $or: [{ "CourseName.en": name }, { "CourseName.ar": name }], // Compare both English & Arabic
+        $or: [
+          { "CourseName.en": name },
+          { "CourseName.ar": name },
+          { "customURLSlug.en": name },
+          { "customURLSlug.ar": name },
+        ], // Compare both English & Arabic
       };
     } else {
       return res
@@ -114,8 +119,8 @@ const getAllCoursesWithUniNames = async (req, res) => {
       {
         $lookup: {
           from: "universities", // University collection
-          localField: "_id", // Match on _id in courseModel
-          foreignField: "courseId", // Reference field in university model
+          localField: "university",
+          foreignField: "_id", // Reference field in university model
           as: "university", // The result will be stored in the "university" field
         },
       },
@@ -150,6 +155,8 @@ const getAllCoursesWithUniNames = async (req, res) => {
           CourseFees: 1,
           ModeOfStudy: 1,
           Requirements: 1,
+          seo: 1,
+          customURLSlug: 1,
           uniName: "$university.uniName", // Extract university name
           uniSymbol: "$university.uniSymbol", // Extract university symbol
           countryNameEn: "$country.countryName.en", // Extract English country name

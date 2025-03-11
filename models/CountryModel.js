@@ -6,6 +6,10 @@ const countrySchema = new Schema({
     en: { type: String, required: true, index: true }, // English name indexed
     ar: { type: String, required: true, index: true },
   },
+  countrySummary: {
+    en: { type: String }, // English overview
+    ar: { type: String }, // Arabic overview
+  },
   countryCurrency: { type: String, required: true },
   countryCode: {
     type: String,
