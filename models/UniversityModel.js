@@ -52,7 +52,6 @@ const universitySchema = new Schema({
     type: Schema.Types.ObjectId,
     ref: "Country",
   },
-
   campuses: [
     {
       campusName: { en: { type: String }, ar: { type: String } },
