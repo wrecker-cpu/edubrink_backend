@@ -16,6 +16,7 @@ router.put(
   auth.restrictToEditorAndAdmin,
   blogController.updateBlog
 );
+router.get("/getAll/User/Insta", blogController.getAllBlogLikeInsta);
 router.get("/:id", auth.protect, blogController.getBlogById);
 router.get("/", auth.protect, blogController.getAllBlog);
 router.delete(

@@ -25,6 +25,10 @@ router.get(
   auth.protect,
   universityController.getUniversitiesLimitedQuery
 );
+router.get(
+  "/getAll/User/Insta",
+  universityController.getAllUniversityLikeInsta
+);
 router.get("/:id", auth.protect, universityController.getUniversityById);
 router.get("/", auth.protect, universityController.getAllUniversities);
 router.delete(

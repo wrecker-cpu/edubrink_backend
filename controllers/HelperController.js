@@ -148,9 +148,33 @@ const updateAllNotification = async (req, res) => {
   }
 };
 
+const publishScheduledBlogs = async () => {
+  try {
+    const currentTime = new Date();
+    const blogsToPublish = await BlogModel.find({
+      status: "Draft",
+      scheduledPublishDate: { $lte: currentTime },
+    });
+
+    for (const blog of blogsToPublish) {
+      blog.status = "Published";
+      blog.scheduledPublishDate = undefined; // Remove the scheduled date
+      await blog.save();
+
+      // Optionally, you can trigger a notification or other actions here
+      await createNotification("Blog", blog, "blogTitle", "updated");
+    }
+
+    console.log(`Published ${blogsToPublish.length} blogs.`);
+  } catch (err) {
+    console.error("Error publishing scheduled blogs:", err);
+  }
+};
+
 module.exports = {
   getAllDropdownData,
   createNotification,
   getAllNotification,
   updateAllNotification,
+  publishScheduledBlogs,
 };

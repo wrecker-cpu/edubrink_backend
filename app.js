@@ -1,6 +1,8 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const compression = require("compression");
+const  helperController  = require("./controllers/HelperController");
+const cron = require("node-cron");
 const cors = require("cors");
 require("dotenv").config(); // Ensure environment variables are loaded
 
@@ -11,6 +13,11 @@ app.use(compression());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
+
+cron.schedule("0 */2 * * *", () => {
+  console.log("Running scheduled blog publish check...");
+  helperController.publishScheduledBlogs();
+});
 
 // Require Routes
 const userRoutes = require("./routes/UserRoutes");

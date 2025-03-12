@@ -1,3 +1,5 @@
+const NodeCache = require("node-cache");
+const cache = new NodeCache({ stdTTL: 300, checkperiod: 310 });
 const universityModel = require("../models/UniversityModel");
 const countryModel = require("../models/CountryModel");
 const courseModel = require("../models/CourseModel");
@@ -152,72 +154,6 @@ const getUniversityByName = async (req, res) => {
   }
 };
 
-// Read (Get) all Universities
-// const getAllUniversities = async (req, res) => {
-//   try {
-//     const universities = await universityModel.aggregate([
-//       // Step 1: Lookup the course information
-//       {
-//         $lookup: {
-//           from: "courses", // The collection name for courses
-//           localField: "courseId", // Field in the university model
-//           foreignField: "_id", // Field in the course model
-//           as: "courseDetails", // The resulting array of course details
-//         },
-//       },
-//       // Step 2: Lookup the country information
-//       {
-//         $lookup: {
-//           from: "countries", // The collection name for countries
-//           localField: "_id", // Assuming the university's `_id` is referenced in the country's `universities` field
-//           foreignField: "universities", // Field in the country model that references universities
-//           as: "countryDetails", // The resulting array of country details
-//         },
-//       },
-//       // Step 3: Unwind the arrays to make them objects
-//       {
-//         $unwind: {
-//           path: "$courseDetails",
-//           preserveNullAndEmptyArrays: true, // Include universities even if they have no courses
-//         },
-//       },
-//       {
-//         $unwind: {
-//           path: "$countryDetails",
-//           preserveNullAndEmptyArrays: true, // Include universities even if they have no country
-//         },
-//       },
-//       // Step 4: Project all the university fields along with course and country data
-//       {
-//         $project: {
-//           uniName: 1, // Include university name
-//           uniSymbol: 1,
-//           courseDetails: 1, // Include all course details
-//           scholarshipAvailability: 1,
-//           inTakeMonth: 1,
-//           inTakeYear: 1,
-//           spokenLanguage: 1,
-//           uniType: 1,
-//           entranceExamRequired: 1,
-//           studyLevel: 1,
-//           uniLocation: 1,
-//           uniTutionFees: 1,
-//           uniOverview: 1,
-//           uniAccomodation: 1,
-//           uniLibrary: 1,
-//           uniSports: 1,
-//           studentLifeStyleInUni: 1,
-//           courseDetails: 1,
-//           countryName: "$countryDetails.countryName", // Extract country name (e.g., { en: ..., ar: ... })
-//         },
-//       },
-//     ]);
-
-//     res.status(200).json({ data: universities });
-//   } catch (err) {
-//     res.status(500).json({ message: err.message });
-//   }
-// };
 const getAllUniversities = async (req, res) => {
   try {
     // Aggregation pipeline to join universities with their countries and populate courses
@@ -302,6 +238,54 @@ const getAllUniversities = async (req, res) => {
       data: universityData,
       message: "Universities fetched successfully",
     });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+const getAllUniversityLikeInsta = async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+    const lastId = req.query.lastId;
+
+    // Cache key based on `limit` & `lastId` to store different requests
+    const cacheKey = `university_limit_${limit}_lastId_${lastId || "start"}`;
+    const cachedData = cache.get(cacheKey);
+
+    // **If cache exists, return cached data**
+    if (cachedData) {
+      return res.status(200).json(cachedData);
+    }
+
+    let filter = {};
+    if (lastId) {
+      filter = { _id: { $gt: lastId } };
+    }
+
+    const universities = await universityModel
+      .find(filter)
+      .sort({ _id: 1 })
+      .limit(limit)
+      .populate("uniCountry")
+      .lean();
+
+    // **Store the last fetched ID**
+    const newLastId = universities.length
+      ? universities[universities.length - 1]._id
+      : null;
+
+    const responseData = {
+      data: universities,
+      meta: {
+        lastId: newLastId,
+        hasNextPage: !!newLastId,
+      },
+    };
+
+    // **Cache the response for future requests**
+    cache.set(cacheKey, responseData);
+
+    res.status(200).json(responseData);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -496,6 +480,7 @@ module.exports = {
   getUniversityByName,
   getAllUniversities,
   getUniversitiesLimitedQuery,
+  getAllUniversityLikeInsta,
   updateUniversity,
   deleteUniversity,
 };

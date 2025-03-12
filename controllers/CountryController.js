@@ -77,48 +77,6 @@ const getAllCountries = async (req, res) => {
   }
 };
 
-// const getAllCountriesByQuery = async (req, res) => {
-//   try {
-//     const { fields, populate } = req.query;
-
-//     // Convert fields into a space-separated string for Mongoose `.select()`
-//     const selectedFields = fields ? fields.split(",").join(" ") : "";
-
-//     // Base query
-//     let query = countryModel.find().select(selectedFields);
-
-//     // Conditionally populate based on query parameters
-//     if (populate) {
-//       const populateFields = populate.split(",");
-
-//       if (populateFields.includes("universities")) {
-//         query = query.populate({
-//           path: "universities",
-//           select: "courseId uniName scholarshipAvailability uniTutionFees",
-//           populate: {
-//             path: "courseId",
-//             model: "Course",
-//             match: { _id: { $ne: null } },
-//             select: "CourseName DeadLine CourseFees",
-//           },
-//         });
-//       }
-
-//       if (populateFields.includes("blog")) {
-//         query = query.populate({
-//           path: "blog",
-//           select: "blogTitle blogSubtitle blogAdded",
-//         });
-//       }
-//     }
-
-//     const countries = await query.lean();
-//     res.status(200).json({ data: countries });
-//   } catch (err) {
-//     res.status(500).json({ message: err.message });
-//   }
-// };
-
 const getAllCountriesByQuery = async (req, res) => {
   try {
     const { fields, populate } = req.query;
@@ -360,53 +318,81 @@ const getFullDepthDataByFilter = async (req, res) => {
       }
     }
 
-    // Step 1: Fetch Countries
+    // Pagination parameters
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 1; // Default 5 per load
+    const skip = (page - 1) * limit;
+
+    // Additional pagination for Load More functionality
+    const universityPage = parseInt(req.query.universityPage) || 1;
+    const coursePage = parseInt(req.query.coursePage) || 1;
+    const blogPage = parseInt(req.query.blogPage) || 1;
+
+    const universitySkip = (universityPage - 1) * limit;
+    const courseSkip = (coursePage - 1) * limit;
+    const blogSkip = (blogPage - 1) * limit;
+
+    // Step 1: Fetch Limited Countries
     const countryFilter = filterProp.Destination
       ? { "countryName.en": { $in: filterProp.Destination } }
       : {};
 
     const countries = await countryModel
       .find(countryFilter)
-      .populate({
-        path: "blog", // Populate blog field
-        model: "Blog",
-        select:
-          "blogTitle blogSubtitle blogAuthor blogCategory blogPhoto blogTags status", // Select only required fields
-      })
-      .select("_id countryName countryPhotos countryCode blog"); // Select required fields from Country
-
-    if (!countries.length)
-      return res.status(404).json({ message: "No countries found" });
+      .select("_id countryName countryPhotos countryCode")
+      .limit(limit)
+      .skip(skip)
+      .lean();
 
     const countryIds = countries.map((c) => c._id);
+    const blogs = await BlogModel.find({ blogCountry: { $in: countryIds } })
+      .select("blogTitle blogSubtitle blogPhoto blogCountry")
+      .limit(limit)
+      .skip(blogSkip)
+      .lean(); // Ensure lean() for performance
 
-    // Step 2: Fetch Universities
+    // Create a mapping of countryId -> blogs
+    const blogMap = blogs.reduce((acc, blog) => {
+      const countryId = blog.blogCountry.toString();
+      if (!acc[countryId]) acc[countryId] = [];
+      acc[countryId].push(blog);
+      return acc;
+    }, {});
+
+    if (!countries.length) {
+      return res.status(404).json({ message: "No countries found" });
+    }
+
+    // Step 2: Fetch Paginated Universities
     const universityFilter = { uniCountry: { $in: countryIds } };
-    if (filterProp.StudyLevel && filterProp.StudyLevel !== "All")
+    if (filterProp.StudyLevel && filterProp.StudyLevel !== "All") {
       universityFilter.studyLevel = { $in: [filterProp.StudyLevel] };
-    if (filterProp.EntranceExam)
+    }
+    if (filterProp.EntranceExam) {
       universityFilter.entranceExamRequired = filterProp.EntranceExam;
-
-    if (filterProp.UniType) universityFilter.uniType = filterProp.UniType;
-
-    if (filterProp.IntakeYear)
+    }
+    if (filterProp.UniType) {
+      universityFilter.uniType = filterProp.UniType;
+    }
+    if (filterProp.IntakeYear) {
       universityFilter.inTakeYear = filterProp.IntakeYear;
-
-    if (filterProp.IntakeMonth)
+    }
+    if (filterProp.IntakeMonth) {
       universityFilter.inTakeMonth = filterProp.IntakeMonth;
+    }
 
-    const universities = await universityModel.find(
-      universityFilter,
-
-      "_id uniCountry uniName uniType studyLevel uniTutionFees uniFeatured uniDiscount entranceExamRequired scholarshipAvailability entranceExamRequired inTakeMonth inTakeYear"
-    );
-
-    if (!universities.length)
-      return res.status(404).json({ message: "No universities found" });
+    const universities = await universityModel
+      .find(
+        universityFilter,
+        "_id uniCountry uniName uniType studyLevel uniTutionFees uniFeatured uniDiscount entranceExamRequired scholarshipAvailability inTakeMonth inTakeYear"
+      )
+      .skip(universitySkip)
+      .limit(limit)
+      .lean();
 
     const universityIds = universities.map((u) => u._id);
 
-    // Step 3: Fetch Courses
+    // Step 3: Fetch Paginated Courses
     const courseFilter = { university: { $in: universityIds } };
     if (filterProp.minBudget || filterProp.maxBudget) {
       courseFilter.CourseFees = {
@@ -414,71 +400,30 @@ const getFullDepthDataByFilter = async (req, res) => {
         $lte: Number(filterProp.maxBudget) || Infinity,
       };
     }
-    if (filterProp["ModeOfStudy"]) {
-      courseFilter.$or = [
-        { "ModeOfStudy.en": filterProp["ModeOfStudy"] },
-        { "ModeOfStudy.ar": filterProp["ModeOfStudy"] },
-      ];
+    if (filterProp.ModeOfStudy) {
+      courseFilter["ModeOfStudy.en"] = { $in: [filterProp.ModeOfStudy] };
+      courseFilter["ModeOfStudy.ar"] = { $in: [filterProp.ModeOfStudy] };
     }
-    if (
-      (filterProp["searchQuery.en"] &&
-        filterProp["searchQuery.en"].trim() !== "") ||
-      (filterProp["searchQuery.ar"] &&
-        filterProp["searchQuery.ar"].trim() !== "")
-    ) {
-      courseFilter.$or = [];
 
-      if (
-        filterProp["searchQuery.en"] &&
-        filterProp["searchQuery.en"].trim() !== ""
-      ) {
+    if (filterProp.searchQuery?.en || filterProp.searchQuery?.ar) {
+      courseFilter.$or = courseFilter.$or || [];
+
+      if (filterProp.searchQuery.en) {
         courseFilter.$or.push({
-          "Tags.en": { $in: [filterProp["searchQuery.en"]] },
+          "Tags.en": { $regex: filterProp.searchQuery.en, $options: "i" },
         });
       }
 
-      if (
-        filterProp["searchQuery.ar"] &&
-        filterProp["searchQuery.ar"].trim() !== ""
-      ) {
+      if (filterProp.searchQuery.ar) {
         courseFilter.$or.push({
-          "Tags.ar": { $in: [filterProp["searchQuery.ar"]] },
-        });
-      }
-    }
-    if (
-      (filterProp.searchQuery?.en && filterProp.searchQuery.en.trim() !== "") ||
-      (filterProp.searchQuery?.ar && filterProp.searchQuery.ar.trim() !== "")
-    ) {
-      courseFilter.$or = [];
-
-      if (
-        filterProp.searchQuery.en &&
-        filterProp.searchQuery.en.trim() !== ""
-      ) {
-        courseFilter.$or.push({
-          "Tags.en": { $in: [filterProp.searchQuery.en] },
-        });
-      }
-
-      if (
-        filterProp.searchQuery.ar &&
-        filterProp.searchQuery.ar.trim() !== ""
-      ) {
-        courseFilter.$or.push({
-          "Tags.ar": { $in: [filterProp.searchQuery.ar] },
+          "Tags.ar": { $regex: filterProp.searchQuery.ar, $options: "i" },
         });
       }
     }
 
     if (filterProp.CourseDuration) {
       let [min, max] = filterProp.CourseDuration.split("-").map(Number);
-
-      if (max === undefined) {
-        max = Infinity; // Handle "60+" case
-      }
-
-      // Convert all durations to months before filtering
+      if (max === undefined) max = Infinity;
       courseFilter.$or = [
         {
           CourseDurationUnits: "Years",
@@ -495,46 +440,77 @@ const getFullDepthDataByFilter = async (req, res) => {
       ];
     }
 
-    const courses = await courseModel.find(
-      courseFilter,
-      "CourseName CourseFees CourseDuration CourseDurationUnits ModeOfStudy Tags university"
-    );
+    const courses = await courseModel
+      .find(
+        courseFilter,
+        "CourseName CourseFees CourseDuration CourseDurationUnits ModeOfStudy Tags university"
+      )
+      .skip(courseSkip)
+      .limit(limit)
+      .lean(); // ✅ Add this
 
-    // Create a map of universities with their courses
+    // Step 4: Fetch Paginated Blogs
+    // Step 4: Fetch Paginated Blogs for Each Country
+
+    // Create university mapping
     const universityMap = universities.reduce((acc, uni) => {
-      if (uni) {
-        acc[uni._id.toString()] = { ...uni.toObject(), courses: [] };
-      }
+      acc[uni._id.toString()] = { ...uni, courses: [] };
       return acc;
     }, {});
 
-    // Assign courses to their respective universities
+    // Assign courses to universities
     courses.forEach((course) => {
-      if (course && universityMap[course.university.toString()]) {
+      if (universityMap[course.university.toString()]) {
         universityMap[course.university.toString()].courses.push(course);
       }
     });
 
-    // Construct the final response
-    const countryData = countries.map((country) => {
-      if (!country) return null; // Skip if country is undefined
+    // Construct response with paginated universities & courses
+    const countryData = countries.map((country) => ({
+      ...country,
+      universities: universities
+        .filter((uni) => uni.uniCountry.toString() === country._id.toString())
+        .map((uni) => ({
+          ...uni,
+          courseId: universityMap[uni._id.toString()]?.courses || [],
+        })),
+      blog: blogMap[country._id.toString()] || [], // ✅ Attach only relevant blogs
+    }));
 
-      return {
-        ...country.toObject(),
-        universities: universities
-          .filter((uni) => uni && uni.uniCountry.toString() === country._id.toString())
-          .map((uni) => ({
-            ...uni.toObject(),
-            courseId: universityMap[uni._id.toString()]?.courses || [],
-          })),
-      };
-    }).filter(Boolean); // Remove null values
+    // Count total documents
 
-    res.status(200).json({ data: countryData });
+    const [totalCountries, totalUniversities, totalCourses, totalBlogs] =
+      await Promise.all([
+        countryModel.countDocuments(countryFilter),
+        universityModel.countDocuments(universityFilter),
+        courseModel.countDocuments(courseFilter),
+        BlogModel.countDocuments(),
+      ]);
+
+    // Pagination metadata
+    const pagination = {
+      page,
+      limit,
+      totalCountries,
+      totalUniversities,
+      totalCourses,
+      totalBlogs,
+      totalPagesCountries: Math.ceil(totalCountries / limit),
+      totalPagesUniversities: Math.ceil(totalUniversities / limit),
+      totalPagesCourses: Math.ceil(totalCourses / limit),
+      totalPagesBlogs: Math.ceil(totalBlogs / limit),
+      hasMoreCountries: page * limit < totalCountries,
+      hasMoreUniversities: universityPage * limit < totalUniversities,
+      hasMoreCourses: coursePage * limit < totalCourses,
+      hasMoreBlogs: blogPage * limit < totalBlogs,
+    };
+
+    res.status(200).json({ data: countryData, pagination });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
+
 
 const updateAllCountries = async (req, res) => {
   try {
@@ -551,8 +527,6 @@ const updateAllCountries = async (req, res) => {
       .json({ message: "Error updating users", error: error.message });
   }
 };
-
-// Update a country by ID
 
 const updateCountry = async (req, res) => {
   const id = req.params.id;
@@ -587,8 +561,6 @@ const updateCountry = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
-
-// Delete a country by ID
 
 const deleteCountry = async (req, res) => {
   const id = req.params.id;

@@ -1,6 +1,8 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const helperController = require("../controllers/HelperController");
+const cron = require("node-cron");
 require("dotenv").config();
 
 const app = express();
@@ -8,6 +10,11 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
+
+cron.schedule("* */2 * * *", () => {
+  console.log("Running scheduled blog publish check...");
+  helperController.publishScheduledBlogs();
+});
 
 // Require Routes
 const userRoutes = require("../routes/UserRoutes");

@@ -1,6 +1,7 @@
+const NodeCache = require("node-cache");
+const cache = new NodeCache({ stdTTL: 300, checkperiod: 310 });
 const blogModel = require("../models/BlogModel");
 const countryModel = require("../models/CountryModel");
-const notificationModel = require("../models/NotificationModel");
 const { createNotification } = require("../controllers/HelperController");
 
 // Create a new blog
@@ -106,7 +107,51 @@ const getAllBlog = async (req, res) => {
   }
 };
 
+const getAllBlogLikeInsta = async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+    const lastId = req.query.lastId;
 
+    // Cache key based on `limit` & `lastId` to store different requests
+    const cacheKey = `blog_limit_${limit}_lastId_${lastId || "start"}`;
+    const cachedData = cache.get(cacheKey);
+
+    // **If cache exists, return cached data**
+    if (cachedData) {
+      return res.status(200).json(cachedData);
+    }
+
+    let filter = {};
+    if (lastId) {
+      filter = { _id: { $gt: lastId } };
+    }
+
+    const blogs = await blogModel
+      .find(filter)
+      .sort({ _id: 1 })
+      .limit(limit)
+      .populate("blogCountry")
+      .lean();
+
+    // **Store the last fetched ID**
+    const newLastId = blogs.length ? blogs[blogs.length - 1]._id : null;
+
+    const responseData = {
+      data: blogs,
+      meta: {
+        lastId: newLastId,
+        hasNextPage: !!newLastId,
+      },
+    };
+
+    // **Cache the response for future requests**
+    cache.set(cacheKey, responseData);
+
+    res.status(200).json(responseData);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
 
 const getBlogByName = async (req, res) => {
   const name = req.params.name;
@@ -212,6 +257,7 @@ module.exports = {
   getBlogById,
   getAllBlog,
   updateBlog,
+  getAllBlogLikeInsta,
   deleteBlog,
   getBlogByName,
 };

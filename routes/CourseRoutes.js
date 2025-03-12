@@ -17,6 +17,7 @@ router.put(
   courseController.updateCourse
 );
 router.get("/getAll/GetAllCourse", courseController.getAllCoursesWithUniNames);
+router.get("/getAll/User/Insta", courseController.getAllCoursesLikeInsta);
 router.get("/:id", courseController.getCourseById);
 router.get("/:id", courseController.getCourseById);
 router.get("/name/:name", courseController.getCourseById);

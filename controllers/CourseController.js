@@ -1,3 +1,5 @@
+const NodeCache = require("node-cache");
+const cache = new NodeCache({ stdTTL: 300, checkperiod: 310 });
 const courseModel = require("../models/CourseModel");
 const universityModel = require("../models/UniversityModel");
 const mongoose = require("mongoose");
@@ -101,6 +103,113 @@ const getAllCourses = async (req, res) => {
         page,
         limit,
         totalPages: Math.ceil(totalCount / limit),
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+const getAllCoursesLikeInsta = async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+    const lastId = req.query.lastId;
+
+    console.log("Raw Query Params:", req.query);
+
+    // Parse filterProp from query
+    let filterProp = {};
+    if (req.query.filterProp) {
+      try {
+        console.log("Raw filterProp:", req.query.filterProp); // Already in JSON format
+        filterProp = JSON.parse(req.query.filterProp); // Parse directly
+        console.log("Parsed FilterProp:", filterProp);
+      } catch (error) {
+        console.error("Error parsing filterProp:", error.message);
+      }
+    }
+
+    let filter = {};
+    if (lastId) {
+      filter._id = { $gt: lastId };
+    }
+
+    // Apply filter logic from filterProp
+    if (filterProp.minBudget || filterProp.maxBudget) {
+      filter.CourseFees = {
+        $gte: Number(filterProp.minBudget) || 0,
+        $lte: Number(filterProp.maxBudget) || Infinity,
+      };
+    }
+    if (filterProp["ModeOfStudy"]) {
+      filter.$or = [
+        { "ModeOfStudy.en": filterProp["ModeOfStudy"] },
+        { "ModeOfStudy.ar": filterProp["ModeOfStudy"] },
+      ];
+    }
+    if (
+      (filterProp["searchQuery.en"] &&
+        filterProp["searchQuery.en"].trim() !== "") ||
+      (filterProp["searchQuery.ar"] &&
+        filterProp["searchQuery.ar"].trim() !== "")
+    ) {
+      filter.$or = [];
+
+      if (
+        filterProp["searchQuery.en"] &&
+        filterProp["searchQuery.en"].trim() !== ""
+      ) {
+        filter.$or.push({
+          "Tags.en": { $in: [filterProp["searchQuery.en"]] },
+        });
+      }
+
+      if (
+        filterProp["searchQuery.ar"] &&
+        filterProp["searchQuery.ar"].trim() !== ""
+      ) {
+        filter.$or.push({
+          "Tags.ar": { $in: [filterProp["searchQuery.ar"]] },
+        });
+      }
+    }
+    if (filterProp.CourseDuration) {
+      let [min, max] = filterProp.CourseDuration.split("-").map(Number);
+      if (max === undefined) {
+        max = Infinity;
+      }
+
+      // Convert all durations to months before filtering
+      filter.$or = [
+        {
+          CourseDurationUnits: "Years",
+          CourseDuration: { $gte: min / 12, $lte: max / 12 },
+        },
+        {
+          CourseDurationUnits: "Months",
+          CourseDuration: { $gte: min, $lte: max },
+        },
+        {
+          CourseDurationUnits: "Weeks",
+          CourseDuration: { $gte: min / 0.23, $lte: max / 0.23 },
+        },
+      ];
+    }
+
+    const courses = await courseModel
+      .find(filter)
+      .sort({ _id: 1 })
+      .limit(limit)
+      .populate("university")
+      .lean();
+
+    // Store the last fetched ID
+    const newLastId = courses.length ? courses[courses.length - 1]._id : null;
+
+    res.status(200).json({
+      data: courses,
+      meta: {
+        lastId: newLastId,
+        hasNextPage: !!newLastId,
       },
     });
   } catch (err) {
@@ -290,6 +399,7 @@ module.exports = {
   getAllCourses,
   updateCourse,
   deleteCourse,
+  getAllCoursesLikeInsta,
   getAllCoursesWithUniNames,
   //   getCourseByName,
 };
