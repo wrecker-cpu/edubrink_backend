@@ -114,15 +114,11 @@ const getAllCoursesLikeInsta = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const lastId = req.query.lastId;
 
-    console.log("Raw Query Params:", req.query);
-
     // Parse filterProp from query
     let filterProp = {};
     if (req.query.filterProp) {
       try {
-        console.log("Raw filterProp:", req.query.filterProp); // Already in JSON format
         filterProp = JSON.parse(req.query.filterProp); // Parse directly
-        console.log("Parsed FilterProp:", filterProp);
       } catch (error) {
         console.error("Error parsing filterProp:", error.message);
       }

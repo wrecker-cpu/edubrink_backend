@@ -89,6 +89,9 @@ const getUniversityByName = async (req, res) => {
           countryFlag: {
             $ifNull: ["$country.countryPhotos.countryFlag", ""],
           },
+          countryCode: {
+            $ifNull: ["$country.countryCode", ""], // Default to empty string if countryFlag is missing
+          },
         },
       },
       // Lookup courses related to the university
@@ -137,6 +140,7 @@ const getUniversityByName = async (req, res) => {
           studentLifeStyleInUni: 1,
           countryName: 1,
           countryFlag: 1,
+          countryCode: 1,
         },
       },
     ]);
@@ -180,6 +184,9 @@ const getAllUniversities = async (req, res) => {
           },
           countryFlag: {
             $ifNull: ["$country.countryPhotos.countryFlag", ""], // Default to empty string if countryFlag is missing
+          },
+          countryCode: {
+            $ifNull: ["$country.countryCode", ""], // Default to empty string if countryFlag is missing
           },
         },
       },
@@ -226,6 +233,7 @@ const getAllUniversities = async (req, res) => {
           studentLifeStyleInUni: 1,
           countryName: 1, // Added countryName field
           countryFlag: 1, // Added countryFlag field from countryPhotos
+          countryCode: 1, // Added countryCode field
         },
       },
     ]);
@@ -293,10 +301,45 @@ const getAllUniversityLikeInsta = async (req, res) => {
 
 const getUniversitiesLimitedQuery = async (req, res) => {
   try {
-    let { page = 1, limit = 9, search = "" } = req.query;
+    let { page = 1, limit = 9, search = "", fields = "" } = req.query;
 
     page = parseInt(page);
     limit = parseInt(limit);
+
+    // Convert comma-separated fields into an object for $project
+    let selectedFields = {};
+    if (fields) {
+      fields.split(",").forEach((field) => (selectedFields[field] = 1));
+    } else {
+      // Default fields if none are provided
+      selectedFields = {
+        uniName: 1,
+        uniSymbol: 1,
+        courseId: 1,
+        scholarshipAvailability: 1,
+        spokenLanguage: 1,
+        uniType: 1,
+        inTakeMonth: 1,
+        inTakeYear: 1,
+        entranceExamRequired: 1,
+        studyLevel: 1,
+        uniLocation: 1,
+        uniTutionFees: 1,
+        uniDiscount: 1,
+        uniMainImage: 1,
+        uniDuration: 1,
+        uniDeadline: 1,
+        uniStartDate: 1,
+        uniOverview: 1,
+        uniAccomodation: 1,
+        uniLibrary: 1,
+        uniSports: 1,
+        studentLifeStyleInUni: 1,
+        countryName: 1,
+        countryFlag: 1,
+        customURLSlug: 1,
+      };
+    }
 
     // Aggregation pipeline
     const universityData = await universityModel.aggregate([
@@ -311,7 +354,7 @@ const getUniversitiesLimitedQuery = async (req, res) => {
       { $unwind: { path: "$country", preserveNullAndEmptyArrays: true } },
       {
         $addFields: {
-          countryName: { $ifNull: ["$country.countryName", {}] }, // Preserve object structure
+          countryName: { $ifNull: ["$country.countryName", {}] },
           countryFlag: { $ifNull: ["$country.countryPhotos.countryFlag", ""] },
         },
       },
@@ -323,45 +366,15 @@ const getUniversitiesLimitedQuery = async (req, res) => {
           as: "courseId",
         },
       },
-
-      // 🔹 Now we apply the search filter AFTER the lookup!
       {
         $match: {
           $or: [
-            { "uniName.en": { $regex: search, $options: "i" } }, // Search by University Name
-            { "countryName.en": { $regex: search, $options: "i" } }, // Search by Country Name (now available)
+            { "uniName.en": { $regex: search, $options: "i" } },
+            { "countryName.en": { $regex: search, $options: "i" } },
           ],
         },
       },
-
-      {
-        $project: {
-          uniName: 1,
-          uniSymbol: 1,
-          courseId: 1,
-          scholarshipAvailability: 1,
-          spokenLanguage: 1,
-          uniType: 1,
-          inTakeMonth: 1,
-          inTakeYear: 1,
-          entranceExamRequired: 1,
-          studyLevel: 1,
-          uniLocation: 1,
-          uniTutionFees: 1,
-          uniDiscount: 1,
-          uniMainImage: 1,
-          uniDuration: 1,
-          uniDeadline: 1,
-          uniStartDate: 1,
-          uniOverview: 1,
-          uniAccomodation: 1,
-          uniLibrary: 1,
-          uniSports: 1,
-          studentLifeStyleInUni: 1,
-          countryName: 1,
-          countryFlag: 1,
-        },
-      },
+      { $project: selectedFields }, // ✅ Dynamically select fields
       { $skip: (page - 1) * limit }, // Pagination
       { $limit: limit }, // Pagination
     ]);

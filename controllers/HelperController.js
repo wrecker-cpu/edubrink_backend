@@ -38,7 +38,7 @@ const getAllDropdownData = async (req, res) => {
       BlogModel.find().select("_id blogTitle").lean(),
       MajorsModel.find().select("_id majorName").lean(),
       UniversityModel.find().select("_id uniName").lean(),
-      CountryModel.find().select("_id countryName countryPhotos").lean(),
+      CountryModel.find().select("_id countryName countryPhotos countryCode").lean(),
       UserModel.countDocuments(), // Get only the count of users
     ]);
 

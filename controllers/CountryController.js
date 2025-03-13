@@ -340,8 +340,6 @@ const getFullDepthDataByFilter = async (req, res) => {
     const countries = await countryModel
       .find(countryFilter)
       .select("_id countryName countryPhotos countryCode")
-      .limit(limit)
-      .skip(skip)
       .lean();
 
     const countryIds = countries.map((c) => c._id);
@@ -510,7 +508,6 @@ const getFullDepthDataByFilter = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
-
 
 const updateAllCountries = async (req, res) => {
   try {

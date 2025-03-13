@@ -1,7 +1,7 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const compression = require("compression");
-const  helperController  = require("./controllers/HelperController");
+const helperController = require("./controllers/HelperController");
 const cron = require("node-cron");
 const cors = require("cors");
 require("dotenv").config(); // Ensure environment variables are loaded
@@ -33,6 +33,7 @@ const applyRoutes = require("./routes/ApplyRoutes");
 const facultyRoutes = require("./routes/FacultyRoutes");
 const majorsRoutes = require("./routes/MajorsRoutes");
 const helperRoutes = require("./routes/HelperRoutes");
+const searchRoutes = require("./routes/SearchRoutes");
 
 app.get("/", (req, res) => {
   res.send("API is running...");
@@ -52,7 +53,7 @@ app.use("/api/apply", applyRoutes);
 app.use("/api/faculty", facultyRoutes);
 app.use("/api/majors", majorsRoutes);
 app.use("/api/helper", helperRoutes);
-
+app.use("/api/search", searchRoutes);
 // DATABASE CONNECTION
 const connectDB = async (retries = 5) => {
   while (retries) {
