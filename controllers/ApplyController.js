@@ -4,44 +4,20 @@ const ApplyModel = require("../models/ApplyModel");
 // Create a new Apply
 const createApply = async (req, res) => {
   try {
-    const { itemId, category, clicks } = req.body;
+    const { category } = req.body;
 
     // Validate if category is valid
-    const allowedCategories = ["University", "Country", "Blog", "Course"];
+    const allowedCategories = ["University", "Course"];
     if (!allowedCategories.includes(category)) {
       return res.status(400).json({ message: "Invalid category" });
     }
+    const newApplyData = new ApplyModel(req.body);
+    await newApplyData.save(); // Save the new record
 
-    // Check if the Apply data for the itemId and category already exists
-    const existingApply = await ApplyModel.findOne({ itemId, category });
-
-    if (existingApply) {
-      // If the record exists, increment the clicks and update the last clicked time
-      existingApply.clicks += clicks;
-      existingApply.lastClickedAt = Date.now();
-
-      await existingApply.save(); // Save the updated record
-
-      return res.status(200).json({
-        message: "Apply updated successfully",
-        data: existingApply,
-      });
-    } else {
-      // If the record does not exist, create a new one
-      const newApplyData = new ApplyModel({
-        itemId,
-        category,
-        clicks,
-        lastClickedAt: Date.now(),
-      });
-
-      await newApplyData.save(); // Save the new record
-
-      return res.status(201).json({
-        message: "Apply created successfully",
-        data: newApplyData,
-      });
-    }
+    return res.status(201).json({
+      message: "Apply created successfully",
+      data: newApplyData,
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -53,8 +29,11 @@ const getApplyById = async (req, res) => {
   try {
     // Find the Apply and populate the 'universities' field
     const ApplyData = await ApplyModel.findById(id)
-      .populate("University Course")
-      .lean();
+    .populate({
+      path: "itemId",
+      select: "CourseName uniName",
+    })
+    .lean();
     if (!ApplyData) {
       return res.status(404).json({ message: "Apply not found" });
     }

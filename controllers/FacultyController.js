@@ -1,6 +1,7 @@
 const NodeCache = require("node-cache");
 const FacultyModel = require("../models/FacultyModel");
 const UniversityModel = require("../models/UniversityModel");
+const mongoose = require("mongoose");
 const MajorModel = require("../models/MajorsModel");
 const { createNotification } = require("../controllers/HelperController");
 
@@ -39,17 +40,51 @@ const createFaculty = async (req, res) => {
   }
 };
 
-// Read (Get) a Faculty by ID
 const getFacultyById = async (req, res) => {
-  const id = req.params.id;
+  const { id } = req.params;
   try {
-    // Find the Faculty and populate the 'universities' field
-    const FacultyData = await FacultyModel.findById(id)
-      .populate("universities major")
+    let matchCondition = {};
+
+    // Check if the provided param is a valid ObjectId
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      matchCondition = { _id: new mongoose.Types.ObjectId(id) };
+    } else {
+      // Match by slug if it's not an ObjectId
+      matchCondition = {
+        $or: [
+          { "facultyName.en": id },
+          { "facultyName.ar": id },
+          { "customURLSlug.en": id },
+          { "customURLSlug.ar": id },
+        ],
+      };
+    }
+
+    const FacultyData = await FacultyModel.findOne(matchCondition)
+      .populate({
+        path: "universities",
+        select:
+          "uniName countryFlag uniSymbol countryCode uniMainImage uniCountry faculty uniTutionFees courseId", // Replace with the fields you need,
+        populate: {
+          path: "uniCountry",
+          select: "countryName", // Only fetch countryName from uniCountry
+        },
+        populate: {
+          path: "faculty",
+          select: "facultyName customURLSlug", // Only fetch countryName from uniCountry
+        },
+      })
+      .populate({
+        path: "major",
+        select: "majorName majorTuitionFees", // Replace with required fields
+        options: { limit: 4 }, // Limit to 4
+      })
       .lean();
+
     if (!FacultyData) {
       return res.status(404).json({ message: "Faculty not found" });
     }
+
     res.status(200).json({ data: FacultyData });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -58,11 +93,15 @@ const getFacultyById = async (req, res) => {
 
 const getAllFaculty = async (req, res) => {
   try {
-    const Faculty = await FacultyModel.find()
+    // Parse the limit from query params, default to 10 if not provided
+    const limit = parseInt(req.query.limit) || 10;
+
+    const faculties = await FacultyModel.find()
       .populate("universities major")
+      .limit(limit) // Apply the limit dynamically
       .lean();
 
-    res.status(200).json({ data: Faculty });
+    res.status(200).json({ data: faculties });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

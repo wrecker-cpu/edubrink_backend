@@ -1,9 +1,12 @@
+const NodeCache = require("node-cache");
+const cache = new NodeCache({ stdTTL: 600, checkperiod: 620 });
 const TagModel = require("../models/TagModel");
 
 const createTag = async (req, res) => {
   try {
     const TagData = new TagModel(req.body);
     await TagData.save();
+    flushTagsCache();
     res.status(201).json({
       data: TagData,
       message: "Tag created successfully",
@@ -12,6 +15,8 @@ const createTag = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+const flushTagsCache = () => cache.del("allTags");
 
 const createBatchTags = async (req, res) => {
   try {
@@ -49,8 +54,19 @@ const getTagById = async (req, res) => {
 
 const getAllTag = async (req, res) => {
   try {
-    const Tag = await TagModel.find().lean(); // Use .lean() for faster query
-    res.status(200).json({ data: Tag, message: "Tags fetched successfully" });
+    const cacheKey = "allTags";
+    const cachedTags = cache.get(cacheKey);
+
+    if (cachedTags) {
+      return res
+        .status(200)
+        .json({ data: cachedTags, message: "Tags fetched from cache" });
+    }
+
+    const tags = await TagModel.find().lean();
+    cache.set(cacheKey, tags); // Store in cache
+
+    res.status(200).json({ data: tags, message: "Tags fetched successfully" });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -66,6 +82,7 @@ const updateTag = async (req, res) => {
     if (!TagData) {
       return res.status(404).json({ message: "Tag not found" });
     }
+    flushTagsCache();
     res.status(200).json({
       data: TagData,
       message: "Tag updated successfully",
@@ -83,6 +100,7 @@ const deleteTag = async (req, res) => {
     if (!deletedTag) {
       return res.status(404).json({ message: "Tag not found" });
     }
+    flushTagsCache();
     res.status(200).json({ message: "Tag deleted successfully" });
   } catch (err) {
     res.status(500).json({ message: err.message });

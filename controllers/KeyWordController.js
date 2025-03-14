@@ -3,6 +3,7 @@ const blogModel = require("../models/BlogModel");
 const countryModel = require("../models/CountryModel");
 const universityModel = require("../models/UniversityModel");
 const courseModel = require("../models/CourseModel");
+const facultyModel = require("../models/FacultyModel");
 const tagModel = require("../models/TagModel");
 
 // Initialize cache with TTL (Time-To-Live) of 10 minutes
@@ -20,14 +21,16 @@ const getKeywords = async (req, res) => {
     }
 
     // Fetch data from MongoDB if not in cache
-    const [blogs, countries, universities, courses, tags] = await Promise.all([
-      blogModel.find({}, "blogTitle customURLSlug").lean(),
-      countryModel.find({}, "countryName customURLSlug").lean(),
-      universityModel.find({}, "uniName customURLSlug").lean(),
-      courseModel.find({}, "CourseName customURLSlug").lean(),
-      tagModel.find({}, "tags").lean(),
-    ]);
-    
+    const [blogs, countries, universities, courses, tags, faculties] =
+      await Promise.all([
+        blogModel.find({}, "blogTitle customURLSlug").lean(),
+        countryModel.find({}, "countryName customURLSlug").lean(),
+        universityModel.find({}, "uniName customURLSlug").lean(),
+        courseModel.find({}, "CourseName customURLSlug").lean(),
+        tagModel.find({}, "tags").lean(),
+        facultyModel.find({}, "facultyName customURLSlug").lean(),
+      ]);
+
     // Extract and group keywords with their respective customURLSlug
     const blogKeywords = blogs.map((blog) => ({
       keywords: [blog.blogTitle?.en, blog.blogTitle?.ar].filter(Boolean),
@@ -50,6 +53,12 @@ const getKeywords = async (req, res) => {
       keywords: [course.CourseName?.en, course.CourseName?.ar].filter(Boolean),
       customURLSlug: course.customURLSlug, // Course slug
     }));
+    const facultyKeywords = faculties.map((faculty) => ({
+      keywords: [faculty.facultyName?.en, faculty.facultyName?.ar].filter(
+        Boolean
+      ),
+      customURLSlug: faculty.customURLSlug, // Course slug
+    }));
 
     const tagKeywords = tags.map((tag) => ({
       keywords: {
@@ -65,6 +74,7 @@ const getKeywords = async (req, res) => {
       { type: "university", data: universityKeywords },
       { type: "course", data: courseKeywords },
       { type: "tag", data: tagKeywords },
+      { type: "faculty", data: facultyKeywords },
     ];
 
     // Store data in cache
