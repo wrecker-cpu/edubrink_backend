@@ -18,7 +18,7 @@ router.put(
 );
 router.get("/getAll/User/Insta", blogController.getAllBlogLikeInsta);
 router.get("/:id", auth.protect, blogController.getBlogById);
-router.get("/", auth.protect, blogController.getAllBlog);
+router.get("/", blogController.getAllBlog);
 router.delete(
   "/:id",
   auth.protect,

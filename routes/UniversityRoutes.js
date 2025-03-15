@@ -20,11 +20,7 @@ router.get(
   auth.protect,
   universityController.getUniversityByName
 );
-router.get(
-  "/fields/query",
-  auth.protect,
-  universityController.getUniversitiesLimitedQuery
-);
+router.get("/fields/query", universityController.getUniversitiesLimitedQuery);
 router.get(
   "/getAll/User/Insta",
   universityController.getAllUniversityLikeInsta
