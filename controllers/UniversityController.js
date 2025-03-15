@@ -141,6 +141,7 @@ const getUniversityByName = async (req, res) => {
           countryName: 1,
           countryFlag: 1,
           countryCode: 1,
+          seo: 1,
         },
       },
     ]);

@@ -91,6 +91,83 @@ const getKeywords = async (req, res) => {
   }
 };
 
+const getKeywordForAdmin = async (req, res) => {
+  try {
+    // Check cache first
+    const cachedData = cache.get("keywordsDataAdmin");
+    if (cachedData) {
+      return res.status(200).json({
+        data: cachedData,
+        message: "Keywords fetched from cache",
+      });
+    }
+
+    // Fetch data from MongoDB if not in cache
+    const [blogs, countries, universities, courses, faculties] =
+      await Promise.all([
+        blogModel.find({}, "_id blogTitle ").lean(),
+        countryModel.find({}, "_id countryName ").lean(),
+        universityModel.find({}, "_id uniName ").lean(),
+        courseModel.find({}, "_id CourseName ").lean(),
+        facultyModel.find({}, "_id facultyName").lean(),
+      ]);
+
+    // Extract and group keywords with their respective customURLSlug
+    const blogKeywords = blogs.map((blog) => ({
+      keywords: [blog.blogTitle?.en, blog.blogTitle?.ar].filter(Boolean),
+      _id: blog._id, // Blog slug
+    }));
+
+    const countryKeywords = countries.map((country) => ({
+      keywords: [country.countryName?.en, country.countryName?.ar].filter(
+        Boolean
+      ),
+      _id: country._id, // Blog slug
+    }));
+
+    const universityKeywords = universities.map((uni) => ({
+      keywords: [uni.uniName?.en, uni.uniName?.ar].filter(Boolean),
+      _id: uni._id, // Blog slug
+    }));
+
+    const courseKeywords = courses.map((course) => ({
+      keywords: [course.CourseName?.en, course.CourseName?.ar].filter(Boolean),
+      _id: course._id, // Blog slug
+    }));
+    const facultyKeywords = faculties.map((faculty) => ({
+      keywords: [faculty.facultyName?.en, faculty.facultyName?.ar].filter(
+        Boolean
+      ),
+      _id: faculty._id, // Blog slug
+    }));
+
+  
+
+    // Create response structure
+    const data = [
+      { type: "blog", data: blogKeywords },
+      { type: "country", data: countryKeywords },
+      { type: "university", data: universityKeywords },
+      { type: "course", data: courseKeywords },
+      { type: "faculty", data: facultyKeywords },
+    ];
+
+    // Store data in cache
+    cache.set("keywordsDataAdmin", data);
+
+    // Send response
+    res.status(200).json({
+      data: data,
+      message: "Keywords fetched successfully",
+    });
+  } catch (error) {
+    console.error("Error fetching keywords:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+
 module.exports = {
   getKeywords,
+  getKeywordForAdmin
 };
