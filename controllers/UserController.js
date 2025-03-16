@@ -100,7 +100,7 @@ const createUserByAdmin = async (req, res) => {
       passwordChangedAt: Date.now(),
       verified: true, // Admin-created users are verified by default
       Status: Status || false,
-      ActionStatus
+      ActionStatus,
     };
 
     // Save the user
@@ -340,43 +340,45 @@ const loginUser = async (req, res) => {
   let user;
 
   try {
-    // Single query with $or for Email and MobileNumber to avoid multiple MongoDB calls
-    user = await userModel.findOne({ Email: Email }).lean(); // Use .lean() to improve query performance
+    user = await userModel.findOne({ Email: Email }).lean(); // Optimize query
 
     if (user) {
       const isPasswordValid = await encrypt.comparePassword(
         Password,
         user.Password
       );
+
       if (isPasswordValid) {
-        if (user.verified !== true) {
+        if (!user.verified) {
+          // Fix: Covers undefined, null, false, 0
           const otpStatus = await sendOtpVerificationEmail({
             id: user._id,
             email: user.Email,
           });
+
           if (otpStatus.status === "pending") {
-            res.status(200).json({
+            return res.status(200).json({
               message: "User created successfully. OTP sent for verification.",
               data: otpStatus,
             });
           } else {
-            // OTP email failed
-            res.status(500).json({
+            return res.status(500).json({
               message: "User created, but failed to send OTP.",
               error: otpStatus.message,
             });
           }
-        } else {
-          auth.createSendToken(user, 200, res); // Send token if password matches
         }
+
+        // User is verified, generate token
+        auth.createSendToken(user, 200, res);
       } else {
-        res.status(400).json({ message: "Invalid password" });
+        return res.status(400).json({ message: "Invalid password" });
       }
     } else {
-      res.status(404).json({ message: "Email Not found" });
+      return res.status(404).json({ message: "Email Not found" });
     }
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    return res.status(500).json({ message: error.message });
   }
 };
 
