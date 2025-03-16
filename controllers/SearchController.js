@@ -151,7 +151,7 @@ const getUniversitiesByCountries = async (req, res) => {
     const universities = await universityModel
       .find(universityFilter)
       .select(
-        "_id uniCountry uniName uniType studyLevel uniTutionFees uniFeatured"
+        "_id uniCountry uniName uniType studyLevel scholarshipAvailability uniDiscount uniTutionFees uniFeatured"
       )
       .populate("uniCountry", "countryName countryPhotos countryCode")
       .skip(skip)
@@ -252,11 +252,11 @@ const getCoursesByUniversities = async (req, res) => {
     const courses = await courseModel
       .find(courseFilter)
       .select(
-        "CourseName CourseFees CourseDuration ModeOfStudy Tags university"
+        "CourseName CourseFees CourseDuration DeadLine ModeOfStudy Tags university"
       )
       .populate(
         "university",
-        "uniName uniType studyLevel uniTutionFees uniFeatured"
+        "uniName uniType studyLevel uniTutionFees  uniFeatured"
       )
       .skip(skip)
       .limit(limit)
