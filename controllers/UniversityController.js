@@ -5,6 +5,7 @@ const countryModel = require("../models/CountryModel");
 const courseModel = require("../models/CourseModel");
 const FacultyModel = require("../models/FacultyModel");
 const { createNotification } = require("../controllers/HelperController");
+const MajorsModel = require("../models/MajorsModel");
 
 // Create a new University
 const createUniversity = async (req, res) => {
@@ -41,7 +42,7 @@ const getUniversityById = async (req, res) => {
     const universityData = await universityModel
       .findById(id)
       .lean()
-      .populate("courseId faculty uniCountry");
+      .populate("courseId faculty uniCountry major");
     if (!universityData) {
       return res.status(404).json({ message: "University not found" });
     }
@@ -342,7 +343,7 @@ const getUniversitiesLimitedQuery = async (req, res) => {
       };
     }
 
-    // Aggregation pipeline
+    // Aggregation pipeline for fetching data
     const universityData = await universityModel.aggregate([
       {
         $lookup: {
@@ -375,17 +376,61 @@ const getUniversitiesLimitedQuery = async (req, res) => {
           ],
         },
       },
-      { $project: selectedFields }, // ✅ Dynamically select fields
-      { $skip: (page - 1) * limit }, // Pagination
-      { $limit: limit }, // Pagination
+      { $project: selectedFields }, // Dynamically select fields
+      { $skip: (page - 1) * limit }, // Pagination: Skip documents
+      { $limit: limit }, // Pagination: Limit documents
     ]);
 
     if (!universityData.length) {
       return res.status(404).json({ message: "Universities not found" });
     }
 
+    // Get total count of universities matching the search criteria
+    const totalCount = await universityModel.aggregate([
+      {
+        $lookup: {
+          from: "countries",
+          localField: "_id",
+          foreignField: "universities",
+          as: "country",
+        },
+      },
+      { $unwind: { path: "$country", preserveNullAndEmptyArrays: true } },
+      {
+        $addFields: {
+          countryName: { $ifNull: ["$country.countryName", {}] },
+          countryFlag: { $ifNull: ["$country.countryPhotos.countryFlag", ""] },
+        },
+      },
+      {
+        $lookup: {
+          from: "courses",
+          localField: "courseId",
+          foreignField: "_id",
+          as: "courseId",
+        },
+      },
+      {
+        $match: {
+          $or: [
+            { "uniName.en": { $regex: search, $options: "i" } },
+            { "countryName.en": { $regex: search, $options: "i" } },
+          ],
+        },
+      },
+      { $count: "totalCount" }, // Count total matching documents
+    ]);
+
+    const totalPages = Math.ceil((totalCount[0]?.totalCount || 0) / limit);
+
     res.status(200).json({
       data: universityData,
+      pagination: {
+        totalCount: totalCount[0]?.totalCount || 0,
+        totalPages,
+        currentPage: page,
+        limit,
+      },
       message: "Universities fetched successfully",
     });
   } catch (err) {
@@ -397,13 +442,13 @@ const getUniversitiesLimitedQuery = async (req, res) => {
 const updateUniversity = async (req, res) => {
   const id = req.params.id;
   try {
-    const { uniCountry, courseId, faculty, ...universityDetails } = req.body;
+    const { uniCountry, courseId, major, ...universityDetails } = req.body;
 
     // Step 1: Find and update the university
     const updatedUniversity = await universityModel
       .findByIdAndUpdate(
         id,
-        { ...universityDetails, courseId, faculty, uniCountry },
+        { ...universityDetails, courseId, faculty, uniCountry, major },
         { new: true }
       )
       .lean();
@@ -428,17 +473,17 @@ const updateUniversity = async (req, res) => {
       );
     }
 
-    if (faculty) {
-      await FacultyModel.updateMany(
-        { universities: id, _id: { $nin: faculty } },
-        { $unset: { universities: "" } }
-      );
-    }
-
     if (courseId) {
       await courseModel.updateMany(
         { university: id, _id: { $nin: courseId } },
         { $unset: { university: "" } }
+      );
+    }
+
+    if (major) {
+      await MajorsModel.updateMany(
+        { _id: { $in: major } }, // Filter: Only update the specified majors
+        { $unset: { university: "" } } // Action: Remove the university reference
       );
     }
 
@@ -475,9 +520,9 @@ const deleteUniversity = async (req, res) => {
       { $pull: { universities: id } }
     );
 
-    await FacultyModel.updateMany(
-      { universities: id },
-      { $pull: { universities: id } } // Correctly removes the university ID from the array
+    await MajorsModel.updateMany(
+      { university: id },
+      { $unset: { university: "" } }
     );
 
     res.status(200).json({

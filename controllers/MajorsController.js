@@ -2,34 +2,41 @@ const NodeCache = require("node-cache");
 const MajorsModel = require("../models/MajorsModel");
 const FacultyModel = require("../models/FacultyModel");
 const { createNotification } = require("../controllers/HelperController");
+const UniversityModel = require("../models/UniversityModel");
 
 // Create a new Majors
 const createMajors = async (req, res) => {
   try {
-    const { faculty, ...majorDetails } = req.body; // Extract faculty ID
+    const { faculty, university, ...majorDetails } = req.body; // Extract faculty & university IDs
 
-    // Step 1: Create a new major
-    const newMajor = new MajorsModel(majorDetails);
+    // Step 1: Create a new major with faculty and university references
+    const newMajor = new MajorsModel({ ...majorDetails, faculty, university });
     await newMajor.save();
 
+    // Create a notification for the new major
     await createNotification("Major", newMajor, "majorName", "created");
 
-    // Step 2: If a faculty is provided, add the major ID to the faculty's major array
+    // Step 2: If a faculty is provided, add the major ID to the faculty's `major` array
     if (faculty) {
       await FacultyModel.findByIdAndUpdate(
         faculty,
         { $push: { major: newMajor._id } }, // Add major ID to faculty's major array
         { new: true }
       );
+    }
 
-      // Also update the faculty reference in the Major itself
-      newMajor.faculty = faculty;
-      await newMajor.save();
+    // Step 3: If a university is provided, add the major ID to the university's `major` array
+    if (university) {
+      await UniversityModel.findByIdAndUpdate(
+        university,
+        { $push: { major: newMajor._id } }, // Correct field should be 'major'
+        { new: true }
+      );
     }
 
     res.status(201).json({
       data: newMajor,
-      message: "Major created successfully and linked to faculty!",
+      message: "Major created successfully and linked to faculty/university!",
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -42,7 +49,7 @@ const getMajorsById = async (req, res) => {
   try {
     // Find the Majors and populate the 'universities' field
     const MajorsData = await MajorsModel.findById(id)
-      .populate("faculty")
+      .populate("faculty university")
       .lean();
     if (!MajorsData) {
       return res.status(404).json({ message: "Majors not found" });
@@ -76,7 +83,7 @@ const getAllMajors = async (req, res) => {
 const updateMajors = async (req, res) => {
   const id = req.params.id;
   try {
-    const { faculty, ...majorDetails } = req.body; // Extract faculty ID separately
+    const { faculty, university, ...majorDetails } = req.body; // Extract faculty & university separately
 
     // Step 1: Find the existing major
     const existingMajor = await MajorsModel.findById(id);
@@ -98,8 +105,29 @@ const updateMajors = async (req, res) => {
         $addToSet: { major: id }, // Avoid duplicates
       });
 
-      // Step 3: Update the major with new faculty reference
+      // Update the major with new faculty reference
       majorDetails.faculty = faculty;
+    }
+
+    // Step 3: If university is updated, adjust references
+    if (
+      university &&
+      university.toString() !== existingMajor.university?.toString()
+    ) {
+      // Remove major ID from old university
+      if (existingMajor.university) {
+        await UniversityModel.findByIdAndUpdate(existingMajor.university, {
+          $pull: { major: id },
+        });
+      }
+
+      // Add major ID to the new university
+      await UniversityModel.findByIdAndUpdate(university, {
+        $addToSet: { major: id }, // Avoid duplicates
+      });
+
+      // Update the major with new university reference
+      majorDetails.university = university;
     }
 
     // Step 4: Update the major details
@@ -111,7 +139,7 @@ const updateMajors = async (req, res) => {
 
     res.status(200).json({
       data: updatedMajor,
-      message: "Major updated successfully with faculty reference!",
+      message: "Major updated successfully with faculty/university references!",
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -135,13 +163,21 @@ const deleteMajors = async (req, res) => {
       });
     }
 
-    // Step 3: Delete the major
+    // Step 3: Remove the major ID from the associated University
+    if (existingMajor.university) {
+      await UniversityModel.findByIdAndUpdate(existingMajor.university, {
+        $pull: { major: id },
+      });
+    }
+
+    // Step 4: Delete the major
     const deletedMajor = await MajorsModel.findByIdAndDelete(id);
 
     await createNotification("Major", deletedMajor, "majorName", "deleted");
 
     res.status(200).json({
-      message: "Major deleted successfully and removed from faculty!",
+      message:
+        "Major deleted successfully and removed from faculty/university!",
     });
   } catch (err) {
     res.status(500).json({ message: err.message });

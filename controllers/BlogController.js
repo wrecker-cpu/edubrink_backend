@@ -47,52 +47,64 @@ const getBlogById = async (req, res) => {
   }
 };
 
-// Read (Get) all blog
 const getAllBlog = async (req, res) => {
-  const { admin } = req.query;
+  const { admin, limit, page, fields } = req.query;
   try {
-    const blogs = await blogModel.aggregate([
+    const parsedLimit = parseInt(limit || 10); // Default limit to 10
+    const parsedPage = parseInt(page || 1); // Default page to 1
+    const skip = (parsedPage - 1) * parsedLimit; // Calculate skip value
+
+    // Convert `fields` query string into an object for MongoDB projection
+    let projectFields = { _id: 1 };
+
+    if (fields) {
+      fields.split(",").forEach((field) => {
+        projectFields[field] = 1;
+      });
+    } else {
+      projectFields = {
+        _id: 1,
+        blogTitle: 1,
+        blogSubtitle: 1,
+        blogDescription: 1,
+        blogAdded: 1,
+        blogPhoto: 1,
+        blogRelated: 1,
+        blogAuthor: 1,
+        blogCategory: 1,
+        publishImmediately: 1,
+        featuredBlog: 1,
+        blogTags: 1,
+        customURLSlug: 1,
+        "blogCountry._id": 1,
+        "blogCountry.countryName": 1,
+        "blogCountry.countryCurrency": 1,
+      };
+    }
+
+    // Aggregation query for fetching blogs
+    const blogsQuery = [
       {
         $lookup: {
-          from: "countries", // Name of the Country collection
-          localField: "blogCountry", // Field in Blog schema (stores country ID)
-          foreignField: "_id", // Field in Country schema (Primary Key)
-          as: "blogCountry", // Renaming output array to blogCountry
+          from: "countries",
+          localField: "blogCountry",
+          foreignField: "_id",
+          as: "blogCountry",
         },
       },
-      {
-        $unwind: {
-          path: "$blogCountry",
-          preserveNullAndEmptyArrays: true, // Keep blogs even if no country is found
-        },
-      },
-      {
-        $project: {
-          _id: 1,
-          blogTitle: 1,
-          blogSubtitle: 1,
-          blogDescription: 1,
-          blogAdded: 1,
-          blogPhoto: 1,
-          blogRelated: 1,
-          blogAuthor: 1,
-          blogCategory: 1,
-          publishImmediately: 1,
-          featuredBlog: 1,
-          blogTags: 1,
-          customURLSlug: 1,
-          "blogCountry._id": 1,
-          "blogCountry.countryName": 1,
-          "blogCountry.countryCurrency": 1,
-        },
-      },
-    ]);
+      { $unwind: { path: "$blogCountry", preserveNullAndEmptyArrays: true } },
+      { $project: projectFields },
+      { $sort: { _id: -1 } }, // Sort newest first
+      { $skip: skip }, // Skip documents for pagination
+      { $limit: parsedLimit }, // Limit the number of documents
+    ];
 
-    let uniqueBlogs = blogs;
+    let blogs = await blogModel.aggregate(blogsQuery);
 
+    // Ensure uniqueness for admin
     if (admin === "true") {
       const seen = new Set();
-      uniqueBlogs = blogs.filter((blog) => {
+      blogs = blogs.filter((blog) => {
         if (!seen.has(blog._id.toString())) {
           seen.add(blog._id.toString());
           return true;
@@ -101,7 +113,43 @@ const getAllBlog = async (req, res) => {
       });
     }
 
-    res.status(200).json({ data: uniqueBlogs });
+    // Only fetch stats when `admin=true`
+    let stats = {};
+    if (admin === "true") {
+      const [countStats] = await blogModel.aggregate([
+        {
+          $group: {
+            _id: null,
+            totalArticles: { $sum: 1 },
+            publishedArticles: {
+              $sum: { $cond: ["$publishImmediately", 1, 0] },
+            },
+            featuredArticles: { $sum: { $cond: ["$featuredBlog", 1, 0] } },
+          },
+        },
+      ]);
+
+      stats = {
+        totalArticles: countStats?.totalArticles || 0,
+        publishedArticles: countStats?.publishedArticles || 0,
+        featuredArticles: countStats?.featuredArticles || 0,
+      };
+    }
+
+    // Get total count of blogs for pagination
+    const totalBlogs = await blogModel.countDocuments();
+    const totalPages = Math.ceil(totalBlogs / parsedLimit);
+
+    res.status(200).json({
+      data: blogs,
+      ...(admin === "true" && { stats }), // Only include `stats` when `admin=true`
+      pagination: {
+        currentPage: parsedPage,
+        totalPages,
+        totalBlogs,
+        limit: parsedLimit,
+      },
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

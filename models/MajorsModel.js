@@ -6,9 +6,9 @@ const majorSchema = new Schema({
     en: { type: String, required: true },
     ar: { type: String, required: true },
   },
-  faculty: {
+  university: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Faculty", // Dynamic reference
+    ref: "University", // Dynamic reference
   },
   modeOfStudy: { type: String },
   duration: {
@@ -37,7 +37,6 @@ const majorSchema = new Schema({
     entranceExamRequired: { type: Boolean },
     featuredMajor: { type: Boolean },
   },
-  
 });
 
 module.exports = mongoose.model("Major", majorSchema); // Exporting the model

@@ -13,10 +13,11 @@ const universitySchema = new Schema({
       ref: "Course",
     },
   ],
-  faculty: [
+
+  major: [
     {
       type: Schema.Types.ObjectId,
-      ref: "Faculty",
+      ref: "Major",
     },
   ],
   uniMainImage: { type: String },

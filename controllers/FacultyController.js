@@ -93,20 +93,83 @@ const getFacultyById = async (req, res) => {
 
 const getAllFaculty = async (req, res) => {
   try {
-    // Parse the limit from query params, default to 10 if not provided
-    const limit = parseInt(req.query.limit) || 10;
+    // Parse query parameters
+    const page = parseInt(req.query.page) || 1; // Default page is 1
+    const limit = parseInt(req.query.limit) || 10; // Default limit is 10
+    const skip = (page - 1) * limit; // Calculate the number of documents to skip
 
-    const faculties = await FacultyModel.find()
-      .populate("universities major")
-      .limit(limit) // Apply the limit dynamically
-      .lean();
+    // Define the fields to select
+    const selectedFields = {
+      facultyName: 1, // Include the `facultyName` field
+      facultyFeatured: 1, // Include the `facultyFeatured` field
+      universities: 1, // Include the `universities` field
+      created_at: 1, // Include the `created_at` field
+      _id: 1, // Include the `_id` field
+    };
 
-    res.status(200).json({ data: faculties });
+    // Aggregation pipeline to fetch faculties with pagination and count `major` field
+    const faculties = await FacultyModel.aggregate([
+      {
+        $project: {
+          ...selectedFields, // Include selected fields
+          majorCount: { $size: "$major" }, // Count the number of elements in the `major` array
+        },
+      },
+      { $skip: skip }, // Skip documents for pagination
+      { $limit: limit }, // Limit the number of documents
+      {
+        $lookup: {
+          from: "universities", // Populate the `universities` field
+          localField: "universities",
+          foreignField: "_id",
+          as: "universities",
+          pipeline: [
+            {
+              $project: {
+                uniName: "$uniName.en", // Extract only the `en` field from `uniName`
+              },
+            },
+          ],
+        },
+      },
+      {
+        $addFields: {
+          universities: {
+            $map: {
+              input: "$universities",
+              as: "uni",
+              in: "$$uni.uniName", // Transform the array to only include `uniName` strings
+            },
+          },
+        },
+      },
+    ]);
+
+    // Get the total count of faculties for pagination metadata
+    const totalCount = await FacultyModel.countDocuments();
+
+    // Get the total count of featured faculties
+    const totalFeaturedCount = await FacultyModel.countDocuments({
+      facultyFeatured: true,
+    });
+
+    // Calculate total pages
+    const totalPages = Math.ceil(totalCount / limit);
+
+    res.status(200).json({
+      data: faculties,
+      pagination: {
+        totalCount, // Total number of faculties
+        totalPages, // Total number of pages
+        currentPage: page, // Current page
+        totalFeaturedCount, // Total number of featured faculties
+        limit, // Number of faculties per page
+      },
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
-
 const getAllFacultyWithUniNames = async (req, res) => {
   try {
     const facultyData = await FacultyModel.aggregate([
