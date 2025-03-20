@@ -65,6 +65,12 @@ const countrySchema = new Schema({
       index: true, // Helps with population queries
     },
   ],
+  faq: [
+    {
+      faqQuestions: { en: { type: String }, ar: { type: String } },
+      faqAnswers: { en: { type: String }, ar: { type: String } },
+    },
+  ],
   hotDestination: { type: Boolean },
   livingCost: { type: String },
   customURLSlug: {

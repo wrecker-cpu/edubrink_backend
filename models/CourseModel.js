@@ -56,6 +56,12 @@ const courseSchema = new Schema({
     en: { type: String },
     ar: { type: String },
   },
+  faq: [
+    {
+      faqQuestions: { en: { type: String }, ar: { type: String } },
+      faqAnswers: { en: { type: String }, ar: { type: String } },
+    },
+  ],
 });
 
 module.exports = mongoose.model("Course", courseSchema); //exporting the model

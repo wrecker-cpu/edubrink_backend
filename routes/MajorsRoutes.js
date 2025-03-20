@@ -11,6 +11,7 @@ router.post(
 );
 router.put("/:id", MajorsController.updateMajors);
 router.get("/:id", MajorsController.getMajorsById);
+router.get("/name/:name", auth.protect, MajorsController.getMajorsByName);
 router.get("/", MajorsController.getAllMajors);
 router.delete(
   "/:id",

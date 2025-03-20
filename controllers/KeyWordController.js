@@ -4,6 +4,7 @@ const countryModel = require("../models/CountryModel");
 const universityModel = require("../models/UniversityModel");
 const courseModel = require("../models/CourseModel");
 const facultyModel = require("../models/FacultyModel");
+const majorModel = require("../models/MajorsModel");
 const tagModel = require("../models/TagModel");
 
 // Initialize cache with TTL (Time-To-Live) of 10 minutes
@@ -21,14 +22,15 @@ const getKeywords = async (req, res) => {
     }
 
     // Fetch data from MongoDB if not in cache
-    const [blogs, countries, universities, courses, tags, faculties] =
+    const [blogs, countries, universities, courses, tags, majors] =
       await Promise.all([
         blogModel.find({}, "blogTitle customURLSlug").lean(),
         countryModel.find({}, "countryName customURLSlug").lean(),
         universityModel.find({}, "uniName customURLSlug").lean(),
         courseModel.find({}, "CourseName customURLSlug").lean(),
         tagModel.find({}, "tags").lean(),
-        facultyModel.find({}, "facultyName customURLSlug").lean(),
+        // facultyModel.find({}, "facultyName customURLSlug").lean(),
+        majorModel.find({}, "_id majorName customURLSlug").lean(),
       ]);
 
     // Extract and group keywords with their respective customURLSlug
@@ -53,11 +55,16 @@ const getKeywords = async (req, res) => {
       keywords: [course.CourseName?.en, course.CourseName?.ar].filter(Boolean),
       customURLSlug: course.customURLSlug, // Course slug
     }));
-    const facultyKeywords = faculties.map((faculty) => ({
-      keywords: [faculty.facultyName?.en, faculty.facultyName?.ar].filter(
-        Boolean
-      ),
-      customURLSlug: faculty.customURLSlug, // Course slug
+    // const facultyKeywords = faculties.map((faculty) => ({
+    //   keywords: [faculty.facultyName?.en, faculty.facultyName?.ar].filter(
+    //     Boolean
+    //   ),
+    //   customURLSlug: faculty.customURLSlug, // Course slug
+    // }));
+
+    const majorKeywords = majors.map((major) => ({
+      keywords: [major.majorName?.en, major.majorName?.ar].filter(Boolean),
+      customURLSlug: major.customURLSlug,
     }));
 
     const tagKeywords = tags.map((tag) => ({
@@ -74,7 +81,8 @@ const getKeywords = async (req, res) => {
       { type: "university", data: universityKeywords },
       { type: "course", data: courseKeywords },
       { type: "tag", data: tagKeywords },
-      { type: "faculty", data: facultyKeywords },
+      // { type: "faculty", data: facultyKeywords },
+      { type: "major", data: majorKeywords },
     ];
 
     // Store data in cache
@@ -103,14 +111,16 @@ const getKeywordForAdmin = async (req, res) => {
     }
 
     // Fetch data from MongoDB if not in cache
-    const [blogs, countries, universities, courses, faculties] =
-      await Promise.all([
+    const [blogs, countries, universities, courses, majors] = await Promise.all(
+      [
         blogModel.find({}, "_id blogTitle ").lean(),
         countryModel.find({}, "_id countryName ").lean(),
         universityModel.find({}, "_id uniName ").lean(),
         courseModel.find({}, "_id CourseName ").lean(),
-        facultyModel.find({}, "_id facultyName").lean(),
-      ]);
+        // facultyModel.find({}, "_id facultyName").lean(),
+        majorModel.find({}, "_id majorName").lean(),
+      ]
+    );
 
     // Extract and group keywords with their respective customURLSlug
     const blogKeywords = blogs.map((blog) => ({
@@ -134,14 +144,17 @@ const getKeywordForAdmin = async (req, res) => {
       keywords: [course.CourseName?.en, course.CourseName?.ar].filter(Boolean),
       _id: course._id, // Blog slug
     }));
-    const facultyKeywords = faculties.map((faculty) => ({
-      keywords: [faculty.facultyName?.en, faculty.facultyName?.ar].filter(
-        Boolean
-      ),
-      _id: faculty._id, // Blog slug
-    }));
 
-  
+    const MajorKeywords = majors.map((major) => ({
+      keywords: [major.majorName?.en, major.majorName?.ar].filter(Boolean),
+      _id: major._id, // Blog slug
+    }));
+    // const facultyKeywords = faculties.map((faculty) => ({
+    //   keywords: [faculty.facultyName?.en, faculty.facultyName?.ar].filter(
+    //     Boolean
+    //   ),
+    //   _id: faculty._id, // Blog slug
+    // }));
 
     // Create response structure
     const data = [
@@ -149,7 +162,8 @@ const getKeywordForAdmin = async (req, res) => {
       { type: "country", data: countryKeywords },
       { type: "university", data: universityKeywords },
       { type: "course", data: courseKeywords },
-      { type: "faculty", data: facultyKeywords },
+      // { type: "faculty", data: facultyKeywords },
+      { type: "major", data: MajorKeywords },
     ];
 
     // Store data in cache
@@ -166,8 +180,7 @@ const getKeywordForAdmin = async (req, res) => {
   }
 };
 
-
 module.exports = {
   getKeywords,
-  getKeywordForAdmin
+  getKeywordForAdmin,
 };

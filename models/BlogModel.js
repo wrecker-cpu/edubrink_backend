@@ -44,6 +44,12 @@ const blogSchema = new Schema({
     en: { type: String },
     ar: { type: String },
   },
+  faq: [
+    {
+      faqQuestions: { en: { type: String }, ar: { type: String } },
+      faqAnswers: { en: { type: String }, ar: { type: String } },
+    },
+  ],
 });
 
 module.exports = mongoose.model("Blog", blogSchema); //exporting the model

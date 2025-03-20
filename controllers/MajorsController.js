@@ -61,6 +61,32 @@ const getMajorsById = async (req, res) => {
   }
 };
 
+const getMajorsByName = async (req, res) => {
+  const name = req.params.name;
+  try {
+    const majorData = await MajorsModel.findOne({
+      $or: [
+        { "majorName.en": name },
+        { "majorName.ar": name },
+        { "customURLSlug.en": name },
+        { "customURLSlug.ar": name },
+      ],
+    })
+      .populate({
+        path: "university",
+        populate: "uniName",
+      })
+      .lean();
+
+    if (!majorData) {
+      return res.status(404).json({ message: "Major not found" });
+    }
+    res.status(200).json({ data: majorData });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 const getAllMajors = async (req, res) => {
   try {
     const {
@@ -253,6 +279,7 @@ module.exports = {
   createMajors,
   getMajorsById,
   getAllMajors,
+  getMajorsByName,
   updateMajors,
   deleteMajors,
 };

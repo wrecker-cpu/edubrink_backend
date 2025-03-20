@@ -37,6 +37,31 @@ const majorSchema = new Schema({
     entranceExamRequired: { type: Boolean },
     featuredMajor: { type: Boolean },
   },
+  faq: [
+    {
+      faqQuestions: { en: { type: String }, ar: { type: String } },
+      faqAnswers: { en: { type: String }, ar: { type: String } },
+    },
+  ],
+  customURLSlug: {
+    en: { type: String },
+    ar: { type: String },
+  },
+
+  seo: {
+    metaTitle: {
+      en: { type: String, index: true },
+      ar: { type: String, index: true },
+    },
+    metaDescription: {
+      en: { type: String },
+      ar: { type: String },
+    },
+    metaKeywords: {
+      en: [{ type: String }], // Array of SEO Keywords in English
+      ar: [{ type: String }], // Array of SEO Keywords in Arabic
+    },
+  },
 });
 
 module.exports = mongoose.model("Major", majorSchema); // Exporting the model

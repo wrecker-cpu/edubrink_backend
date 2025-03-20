@@ -62,7 +62,7 @@ const getCourseById = async (req, res) => {
     // Find course and populate university field
     const courseData = await courseModel
       .findOne(matchCondition)
-      .populate("university");
+      .populate("university", "uniName uniSymbol");
 
     if (!courseData) {
       return res.status(404).json({ message: "Course not found" });

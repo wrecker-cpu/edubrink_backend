@@ -42,7 +42,7 @@ const getUniversityById = async (req, res) => {
     const universityData = await universityModel
       .findById(id)
       .lean()
-      .populate("courseId faculty uniCountry major");
+      .populate("courseId uniCountry major");
     if (!universityData) {
       return res.status(404).json({ message: "University not found" });
     }
