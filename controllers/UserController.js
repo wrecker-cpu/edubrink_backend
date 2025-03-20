@@ -264,13 +264,68 @@ const sendOtpVerificationEmail = async ({ id, email }) => {
 // Get all users
 const getAllUser = async (req, res) => {
   try {
-    const user = await userModel.find().lean(); // Use .lean() for faster query
-    res.status(200).json({ data: user, message: "Users fetched successfully" });
+    const { page = 1, limit = 10, search = "", status, role } = req.query;
+
+    // Parse query parameters
+    const parsedPage = parseInt(page); // Default page is 1
+    const parsedLimit = parseInt(limit); // Default limit is 10
+    const skip = (parsedPage - 1) * parsedLimit; // Calculate the number of documents to skip
+
+    // Build the query for filtering
+    const query = {};
+    if (search) {
+      // Add search condition to the query
+      query.$or = [
+        { FullName: { $regex: search, $options: "i" } }, // Case-insensitive search on name
+        { Email: { $regex: search, $options: "i" } }, // Case-insensitive search on email
+        // Add more fields to search if needed
+      ];
+    }
+
+    if (status) {
+      query.Status = { $regex: `^${status}$`, $options: "i" }; // Case-insensitive match
+    }
+
+    if (role) {
+      // Parse the `role` parameter into an array
+      let rolesArray;
+      try {
+        rolesArray = JSON.parse(role); // Parse the URL-encoded array
+      } catch (err) {
+        rolesArray = [role]; // Fallback to a single role if parsing fails
+      }
+
+      // Add filter for `ActionStatus` using the parsed roles (case-sensitive)
+      query.ActionStatus = { $in: rolesArray }; // Case-sensitive match
+    }
+
+    // Fetch users with pagination and filtering
+    const users = await userModel
+      .find(query)
+      .skip(skip) // Skip documents for pagination
+      .limit(parsedLimit) // Limit the number of documents
+      .lean(); // Convert to plain JavaScript objects
+
+    // Get the total count of users for pagination metadata (with the same filter)
+    const totalCount = await userModel.countDocuments(query);
+
+    // Calculate total pages
+    const totalPages = Math.ceil(totalCount / parsedLimit);
+
+    res.status(200).json({
+      data: users,
+      pagination: {
+        totalCount, // Total number of users
+        totalPages, // Total number of pages
+        currentPage: parsedPage, // Current page
+        limit: parsedLimit, // Number of users per page
+      },
+      message: "Users fetched successfully",
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
-
 const updateAllUsers = async (req, res) => {
   try {
     const updateData = req.body;

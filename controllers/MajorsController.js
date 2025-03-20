@@ -1,6 +1,7 @@
 const NodeCache = require("node-cache");
 const MajorsModel = require("../models/MajorsModel");
 const FacultyModel = require("../models/FacultyModel");
+
 const { createNotification } = require("../controllers/HelperController");
 const UniversityModel = require("../models/UniversityModel");
 
@@ -49,7 +50,7 @@ const getMajorsById = async (req, res) => {
   try {
     // Find the Majors and populate the 'universities' field
     const MajorsData = await MajorsModel.findById(id)
-      .populate("faculty university")
+      .populate("university")
       .lean();
     if (!MajorsData) {
       return res.status(404).json({ message: "Majors not found" });
@@ -62,18 +63,82 @@ const getMajorsById = async (req, res) => {
 
 const getAllMajors = async (req, res) => {
   try {
-    const Majors = await MajorsModel.find()
-      .populate({
-        path: "faculty",
-        select: "facultyName",
-        populate: {
-          path: "universities", // Assuming "universities" is the reference in Faculty model
-          select: "uniName", // Only fetching uniName
-        },
-      })
-      .lean();
+    const {
+      page,
+      limit,
+      search,
+      scholarships,
+      featured,
+      duration,
+      durationUnit,
+    } = req.query;
 
-    res.status(200).json({ data: Majors });
+    // Parse query parameters
+    const parsedPage = parseInt(page) || 1; // Default page is 1
+    const parsedLimit = parseInt(limit) || 10; // Default limit is 10
+    const skip = (parsedPage - 1) * parsedLimit; // Calculate the number of documents to skip
+
+    // Build the query for filtering
+    const query = {};
+    if (search) {
+      // Add search condition to the query for `majorName`
+      query.$or = [{ "majorName.en": { $regex: search, $options: "i" } }];
+
+      // If searching in `university.uniName`, fetch matching universities first
+      const matchingUniversities = await UniversityModel.find(
+        { "uniName.en": { $regex: search, $options: "i" } },
+        { _id: 1 } // Only fetch the `_id` field
+      );
+
+      // Extract the `_id`s of matching universities
+      const universityIds = matchingUniversities.map((uni) => uni._id);
+
+      // Add the matching university IDs to the query
+      if (universityIds.length > 0) {
+        query.$or.push({ university: { $in: universityIds } });
+      }
+    }
+
+    if (scholarships === "true") {
+      query["majorCheckBox.scholarshipsAvailable"] = true;
+    }
+    if (featured === "true") {
+      query["majorCheckBox.featuredMajor"] = true;
+    }
+
+    if (duration && durationUnit) {
+      const parsedDuration = parseFloat(duration); // Convert duration to a number
+      if (!isNaN(parsedDuration)) {
+        query.duration = parsedDuration;
+        query.durationUnits = durationUnit;
+      }
+    }
+
+    // Fetch majors with pagination, filtering, and populate the `university` field
+    const majors = await MajorsModel.find(query)
+      .populate({
+        path: "university", // Populate the `university` field
+        select: "uniName", // Only fetch the `uniName` field
+      })
+      .skip(skip) // Skip documents for pagination
+      .limit(parsedLimit) // Limit the number of documents
+      .lean(); // Convert to plain JavaScript objects
+
+    // Get the total count of majors for pagination metadata (with the same filter)
+    const totalCount = await MajorsModel.countDocuments(query);
+
+    // Calculate total pages
+    const totalPages = Math.ceil(totalCount / parsedLimit);
+
+    res.status(200).json({
+      data: majors,
+      pagination: {
+        totalCount, // Total number of majors
+        totalPages, // Total number of pages
+        currentPage: parsedPage, // Current page
+        limit: parsedLimit, // Number of majors per page
+      },
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

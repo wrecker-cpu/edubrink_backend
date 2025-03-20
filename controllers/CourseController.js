@@ -76,39 +76,97 @@ const getCourseById = async (req, res) => {
 
 const getAllCourses = async (req, res) => {
   try {
+    const {
+      all,
+      page,
+      limit,
+      search,
+      mostPopular,
+      scholarships,
+      discount,
+      duration,
+      durationUnit,
+    } = req.query;
+
     // Check if the `all` query parameter is set to true
-    if (req.query.all === "true") {
-      // Fetch all courses without limit or skip
+    if (all === "true") {
+      // Fetch all courses without pagination
       const courses = await courseModel.find().populate("university").lean();
       return res.status(200).json({ data: courses });
     }
 
     // Default pagination behavior
-    const limit = parseInt(req.query.limit) || 10; // Default to 10 items per page
-    const page = parseInt(req.query.page) || 1; // Default to the first page
-    const skip = (page - 1) * limit; // Calculate how many items to skip
+    const parsedLimit = parseInt(limit) || 10; // Default to 10 items per page
+    const parsedPage = parseInt(page) || 1; // Default to the first page
+    const skip = (parsedPage - 1) * parsedLimit; // Calculate how many items to skip
 
+    // Build the query for filtering
+    const query = {};
+    if (search) {
+      // Add search condition to the query for `courseName.en`
+      query.$or = [{ "CourseName.en": { $regex: search, $options: "i" } }];
+
+      // If searching in `university.uniName.en`, fetch matching universities first
+      const matchingUniversities = await universityModel.find(
+        { "uniName.en": { $regex: search, $options: "i" } },
+        { _id: 1 } // Only fetch the `_id` field
+      );
+
+      // Extract the `_id`s of matching universities
+      const universityIds = matchingUniversities.map((uni) => uni._id);
+
+      // Add the matching university IDs to the query
+      if (universityIds.length > 0) {
+        query.$or.push({ university: { $in: universityIds } });
+      }
+    }
+
+    if (mostPopular === "true") {
+      query.MostPopular = true;
+    }
+    if (scholarships === "true") {
+      query.scholarshipsAvailable = true;
+    }
+    if (discount === "true") {
+      query.DiscountAvailable = true;
+    }
+
+    if (duration && durationUnit) {
+      const parsedDuration = parseFloat(duration); // Convert duration to a number
+      if (!isNaN(parsedDuration)) {
+        query.CourseDuration = parsedDuration;
+        query.CourseDurationUnits = durationUnit;
+      }
+    }
+
+    // Fetch courses with pagination, filtering, and populate the `university` field
     const courses = await courseModel
-      .find()
+      .find(query) // Apply the search filter
       .populate("university")
       .skip(skip)
-      .limit(limit)
+      .limit(parsedLimit)
       .lean();
-    const totalCount = await courseModel.countDocuments();
+
+    // Get the total count of courses for pagination metadata (with the same filter)
+    const totalCount = await courseModel.countDocuments(query);
+
+    // Calculate total pages
+    const totalPages = Math.ceil(totalCount / parsedLimit);
 
     res.status(200).json({
       data: courses,
-      meta: {
-        total: totalCount,
-        page,
-        limit,
-        totalPages: Math.ceil(totalCount / limit),
+      pagination: {
+        totalCount, // Total number of courses
+        totalPages, // Total number of pages
+        currentPage: parsedPage, // Current page
+        limit: parsedLimit, // Number of courses per page
       },
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
+
 const getAllCoursesLikeInsta = async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 10;

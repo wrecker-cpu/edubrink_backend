@@ -48,7 +48,18 @@ const getBlogById = async (req, res) => {
 };
 
 const getAllBlog = async (req, res) => {
-  const { admin, limit, page, fields } = req.query;
+  const {
+    admin,
+    limit,
+    page,
+    fields,
+    search,
+    featured,
+    published,
+    draft,
+    startDate,
+    endDate,
+  } = req.query;
   try {
     const parsedLimit = parseInt(limit || 10); // Default limit to 10
     const parsedPage = parseInt(page || 1); // Default page to 1
@@ -82,8 +93,44 @@ const getAllBlog = async (req, res) => {
       };
     }
 
+    // Build the match query for filtering
+    const matchQuery = {};
+    if (search) {
+      matchQuery.$or = [
+        { "blogTitle.en": { $regex: search, $options: "i" } }, // Case-insensitive search on blogTitle
+        { "blogSubtitle.en": { $regex: search, $options: "i" } }, // Case-insensitive search on blogSubtitle
+        { "blogCountry.countryName.en": { $regex: search, $options: "i" } }, // Case-insensitive search on countryName
+        { blogAuthor: { $regex: search, $options: "i" } }, // Case-insensitive search on author
+      ];
+    }
+
+    if (startDate && endDate) {
+      const start = new Date(startDate); // Convert startDate to a Date object
+      const end = new Date(endDate); // Convert endDate to a Date object
+
+      // Ensure the dates are valid
+      if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+        matchQuery.blogAdded = {
+          $gte: start, // Greater than or equal to startDate
+          $lte: end, // Less than or equal to endDate
+        };
+      }
+    }
+
+    // Add filters for featured, published, and draft
+    if (featured === "true") {
+      matchQuery.featuredBlog = true;
+    }
+    if (published === "true") {
+      matchQuery.publishImmediately = true;
+    }
+    if (draft === "true") {
+      matchQuery.publishImmediately = false; // Assuming draft means not published
+    }
+
     // Aggregation query for fetching blogs
     const blogsQuery = [
+      { $match: matchQuery }, // Apply the search and filter conditions
       {
         $lookup: {
           from: "countries",
@@ -117,6 +164,7 @@ const getAllBlog = async (req, res) => {
     let stats = {};
     if (admin === "true") {
       const [countStats] = await blogModel.aggregate([
+        { $match: matchQuery }, // Apply the same filters for stats
         {
           $group: {
             _id: null,
@@ -136,8 +184,8 @@ const getAllBlog = async (req, res) => {
       };
     }
 
-    // Get total count of blogs for pagination
-    const totalBlogs = await blogModel.countDocuments();
+    // Get total count of blogs for pagination (with the same filters)
+    const totalBlogs = await blogModel.countDocuments(matchQuery);
     const totalPages = Math.ceil(totalBlogs / parsedLimit);
 
     res.status(200).json({
