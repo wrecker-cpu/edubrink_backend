@@ -10,7 +10,7 @@ const ApplySchema = new Schema({
   category: {
     type: String,
     required: true,
-    enum: ["University", "Course"],
+    enum: ["University", "Course", "Major"],
   },
   userDetails: {
     personName: { type: String },
@@ -49,7 +49,7 @@ const ApplySchema = new Schema({
   appliedDate: {
     type: Date,
     default: Date.now,
-  }
+  },
 });
 
 module.exports = mongoose.model("Apply", ApplySchema);

@@ -53,75 +53,124 @@ const getUniversityById = async (req, res) => {
 };
 
 const getUniversityByName = async (req, res) => {
-  const name = req.params.name; // Get university name from route parameters
+  const name = req.params.name;
+  const coursePage = parseInt(req.query.coursePage) || 1;
+  const courseLimit = parseInt(req.query.courseLimit) || 2;
+  const majorPage = parseInt(req.query.majorPage) || 1;
+  const majorLimit = parseInt(req.query.majorLimit) || 2;
+  const studyLevel = req.query.studyLevel;
+  const modeOfStudy = req.query.modeOfStudy; // Get ModeOfStudy from query params
 
   try {
     const universityData = await universityModel.aggregate([
       {
         $match: {
           $or: [
-            { "uniName.en": { $regex: name, $options: "i" } }, // Case-insensitive search in English name
-            { "uniName.ar": { $regex: name, $options: "i" } }, // Case-insensitive search in Arabic name
+            { "uniName.en": { $regex: name, $options: "i" } },
+            { "uniName.ar": { $regex: name, $options: "i" } },
             { "customURLSlug.en": { $regex: name, $options: "i" } },
             { "customURLSlug.ar": { $regex: name, $options: "i" } },
           ],
         },
       },
-      // Lookup country data using `uniCountry` field
       {
         $lookup: {
-          from: "countries", // The countries collection
-          localField: "uniCountry", // The `uniCountry` field in University model
-          foreignField: "_id", // Match with `_id` in Country collection
-          as: "country", // This will store country data in the "country" array
+          from: "countries",
+          localField: "uniCountry",
+          foreignField: "_id",
+          as: "country",
         },
       },
       {
         $unwind: {
           path: "$country",
-          preserveNullAndEmptyArrays: true, // Keep universities without a country
+          preserveNullAndEmptyArrays: true,
         },
       },
       {
         $addFields: {
-          countryName: {
-            $ifNull: ["$country.countryName", ""], // Default to empty string if missing
-          },
-          countryFlag: {
-            $ifNull: ["$country.countryPhotos.countryFlag", ""],
-          },
-          countryCode: {
-            $ifNull: ["$country.countryCode", ""], // Default to empty string if countryFlag is missing
-          },
-        },
-      },
-      // Lookup courses related to the university
-      {
-        $lookup: {
-          from: "courses", // The courses collection
-          localField: "courseId", // The field in University model containing course IDs
-          foreignField: "_id", // Match with Course _id
-          as: "courses", // Store populated courses in "courses"
+          countryName: { $ifNull: ["$country.countryName", ""] },
+          countryFlag: { $ifNull: ["$country.countryPhotos.countryFlag", ""] },
+          countryCode: { $ifNull: ["$country.countryCode", ""] },
         },
       },
       {
         $lookup: {
-          from: "faculties", // The courses collection
-          localField: "faculty", // The field in University model containing course IDs
-          foreignField: "_id", // Match with Course _id
-          as: "faculties", // Store populated courses in "courses"
+          from: "courses",
+          let: { courseIds: "$courseId" },
+          pipeline: [
+            { $match: { $expr: { $in: ["$_id", "$$courseIds"] } } },
+            // Add ModeOfStudy filter if provided
+            ...(studyLevel
+              ? [
+                  {
+                    $match: { StudyLevel: { $in: [studyLevel] } },
+                  },
+                ]
+              : []),
+            { $skip: (coursePage - 1) * courseLimit },
+            { $limit: courseLimit },
+            // Project only the required fields for courses
+            {
+              $project: {
+                CourseName: 1, // Include only the courseName field
+                CourseDuration: 1, // Include only the courseDuration field
+                CourseFees: 1, // Include only the courseFees field
+                Languages: 1,
+                ModeOfStudy: 1,
+                DeadLine: 1,
+                StudyLevel: 1,
+                customURLSlug: 1,
+              },
+            },
+          ],
+          as: "courses",
+        },
+      },
+      {
+        $lookup: {
+          from: "majors",
+          let: { majorIds: "$major" },
+          pipeline: [
+            { $match: { $expr: { $in: ["$_id", "$$majorIds"] } } },
+            ...(modeOfStudy
+              ? [
+                  {
+                    $match: { modeOfStudy: { $in: [modeOfStudy] } },
+                  },
+                ]
+              : []),
+            { $skip: (majorPage - 1) * majorLimit },
+            { $limit: majorLimit },
+            // Project only the required fields for majors
+            {
+              $project: {
+                majorName: 1,
+                majorTuitionFees: 1,
+                studyLevel: 1,
+                modeOfStudy: 1,
+                customURLSlug: 1,
+              },
+            },
+          ],
+          as: "majors",
+        },
+      },
+      {
+        $addFields: {
+          totalCourses: { $size: "$courseId" }, // Calculate total courses
+          totalMajors: { $size: "$major" }, // Calculate total majors
         },
       },
       {
         $project: {
-          uniName: 1, // University name
-          uniSymbol: 1, // University logo
-          courses: 1, // Populated courses (now including Tags)
+          uniName: 1,
+          uniSymbol: 1,
+          courses: 1,
+          majors: 1,
           scholarshipAvailability: 1,
           uniDiscount: 1,
           uniMainImage: 1,
-          courses: 1,
-          faculties: 1,
           campuses: 1,
           uniDeadline: 1,
           uniDuration: 1,
@@ -139,10 +188,10 @@ const getUniversityByName = async (req, res) => {
           uniLibrary: 1,
           uniSports: 1,
           studentLifeStyleInUni: 1,
-          countryName: 1,
-          countryFlag: 1,
-          countryCode: 1,
+          customURLSlug: 1,
           seo: 1,
+          totalCourses: 1,
+          totalMajors: 1,
         },
       },
     ]);
@@ -152,14 +201,23 @@ const getUniversityByName = async (req, res) => {
     }
 
     res.status(200).json({
-      data: universityData[0], // Since we're searching by name, return the first match
+      data: universityData[0],
       message: "University fetched successfully",
+      coursePagination: {
+        page: coursePage,
+        limit: courseLimit,
+        total: universityData[0].totalCourses,
+      },
+      majorPagination: {
+        page: majorPage,
+        limit: majorLimit,
+        total: universityData[0].totalMajors,
+      },
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
-
 const getAllUniversities = async (req, res) => {
   try {
     // Aggregation pipeline to join universities with their countries and populate courses
@@ -448,7 +506,7 @@ const updateUniversity = async (req, res) => {
     const updatedUniversity = await universityModel
       .findByIdAndUpdate(
         id,
-        { ...universityDetails, courseId, faculty, uniCountry, major },
+        { ...universityDetails, courseId, uniCountry, major },
         { new: true }
       )
       .lean();

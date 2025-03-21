@@ -265,8 +265,14 @@ const getBlogByName = async (req, res) => {
       })
       .populate({
         path: "blogCountry",
-        populate: "blog",
+        select: "countryName countryPhotos countryCode", // Include only specific fields
+        populate: {
+          path: "blog",
+          select: "blogTitle blogSubtitle blogAdded blogPhoto customURLSlug", // Limit fields in the blog
+          options: { limit: 5 },
+        },
       })
+
       .lean();
 
     if (!blogData) {

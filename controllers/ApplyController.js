@@ -7,7 +7,7 @@ const createApply = async (req, res) => {
     const { category } = req.body;
 
     // Validate if category is valid
-    const allowedCategories = ["University", "Course"];
+    const allowedCategories = ["University", "Course", "Major"];
     if (!allowedCategories.includes(category)) {
       return res.status(400).json({ message: "Invalid category" });
     }
@@ -31,7 +31,7 @@ const getApplyById = async (req, res) => {
     const ApplyData = await ApplyModel.findById(id)
       .populate({
         path: "itemId",
-        select: "CourseName uniName",
+        select: "CourseName uniName majorName",
       })
       .lean();
     if (!ApplyData) {
@@ -44,7 +44,15 @@ const getApplyById = async (req, res) => {
 };
 const getAllApply = async (req, res) => {
   try {
-    const { page = 1, limit = 10, search, status, category,startDate,endDate } = req.query;
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      status,
+      category,
+      startDate,
+      endDate,
+    } = req.query;
 
     // Parse query parameters
     const parsedPage = parseInt(page); // Default page is 1

@@ -144,17 +144,21 @@ const getCountryByName = async (req, res) => {
       })
       .populate({
         path: "universities",
-        select: "courseId uniName scholarshipAvailability uniTutionFees",
+        select:
+          "courseId uniName customURLSlug scholarshipAvailability uniTutionFees",
+        options: { limit: 5 }, // Limit universities to 5
         populate: {
           path: "courseId",
           model: "Course",
-          match: { _id: { $ne: null } }, // Ensures only non-null IDs are used
-          select: "CourseName DeadLine CourseFees", // Include only specific fields
+          match: { _id: { $ne: null } }, // Ensure only non-null IDs are used
+          select: "CourseName DeadLine customURLSlug CourseFees",
+          options: { limit: 3 }, // Limit courses to 3 per university
         },
       })
       .populate({
         path: "blog",
-        select: "blogTitle blogSubtitle blogAdded",
+        select: "blogTitle customURLSlug blogSubtitle blogAdded",
+        options: { limit: 3 }, // Limit blogs to 3
       })
       .lean();
 

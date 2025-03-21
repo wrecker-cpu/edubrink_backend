@@ -74,7 +74,7 @@ const getMajorsByName = async (req, res) => {
     })
       .populate({
         path: "university",
-        populate: "uniName",
+        select: "uniName customURLSlug uniSymbol",
       })
       .lean();
 
