@@ -107,10 +107,7 @@ const getAllMajors = async (req, res) => {
     // Build the query for filtering
     const query = {};
     if (search) {
-      // Add search condition to the query for `majorName`
-      query.$or = [{ "majorName.en": { $regex: search, $options: "i" } }];
-
-      // If searching in `university.uniName`, fetch matching universities first
+      // Step 1: Fetch matching universities based on the search term
       const matchingUniversities = await UniversityModel.find(
         { "uniName.en": { $regex: search, $options: "i" } },
         { _id: 1 } // Only fetch the `_id` field
@@ -119,10 +116,11 @@ const getAllMajors = async (req, res) => {
       // Extract the `_id`s of matching universities
       const universityIds = matchingUniversities.map((uni) => uni._id);
 
-      // Add the matching university IDs to the query
-      if (universityIds.length > 0) {
-        query.$or.push({ university: { $in: universityIds } });
-      }
+      // Step 2: Build the query for majors
+      query.$or = [
+        { "majorName.en": { $regex: search, $options: "i" } }, // Search in majorName
+        { university: { $in: universityIds } }, // Search in university IDs
+      ];
     }
 
     if (scholarships === "true") {

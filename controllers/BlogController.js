@@ -100,6 +100,7 @@ const getAllBlog = async (req, res) => {
         { "blogTitle.en": { $regex: search, $options: "i" } }, // Case-insensitive search on blogTitle
         { "blogSubtitle.en": { $regex: search, $options: "i" } }, // Case-insensitive search on blogSubtitle
         { "blogCountry.countryName.en": { $regex: search, $options: "i" } }, // Case-insensitive search on countryName
+        { blogCategory: { $regex: search, $options: "i" } }, // Case-insensitive search on author
         { blogAuthor: { $regex: search, $options: "i" } }, // Case-insensitive search on author
       ];
     }

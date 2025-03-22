@@ -10,7 +10,7 @@ const majorSchema = new Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: "University", // Dynamic reference
   },
-  modeOfStudy: { type: String },
+  modeOfStudy: [{ type: String }],
   duration: {
     type: Number,
   },

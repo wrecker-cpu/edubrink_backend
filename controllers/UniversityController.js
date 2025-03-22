@@ -58,8 +58,17 @@ const getUniversityByName = async (req, res) => {
   const courseLimit = parseInt(req.query.courseLimit) || 2;
   const majorPage = parseInt(req.query.majorPage) || 1;
   const majorLimit = parseInt(req.query.majorLimit) || 2;
-  const studyLevel = req.query.studyLevel;
-  const modeOfStudy = req.query.modeOfStudy; // Get ModeOfStudy from query params
+  const studyLevel = req.query.studyLevel
+    ? Array.isArray(req.query.studyLevel)
+      ? req.query.studyLevel
+      : req.query.studyLevel.split(",")
+    : [];
+
+  const modeOfStudy = req.query.modeOfStudy
+    ? Array.isArray(req.query.modeOfStudy)
+      ? req.query.modeOfStudy
+      : req.query.modeOfStudy.split(",")
+    : [];
 
   try {
     const universityData = await universityModel.aggregate([
@@ -92,6 +101,7 @@ const getUniversityByName = async (req, res) => {
           countryName: { $ifNull: ["$country.countryName", ""] },
           countryFlag: { $ifNull: ["$country.countryPhotos.countryFlag", ""] },
           countryCode: { $ifNull: ["$country.countryCode", ""] },
+          customURLSlug: { $ifNull: ["$country.customURLSlug", ""] },
         },
       },
       {
@@ -100,22 +110,28 @@ const getUniversityByName = async (req, res) => {
           let: { courseIds: "$courseId" },
           pipeline: [
             { $match: { $expr: { $in: ["$_id", "$$courseIds"] } } },
-            // Add ModeOfStudy filter if provided
-            ...(studyLevel
+            ...(studyLevel.length > 0
               ? [
                   {
-                    $match: { StudyLevel: { $in: [studyLevel] } },
+                    $match: { StudyLevel: { $in: studyLevel } },
+                  },
+                ]
+              : []),
+            ...(modeOfStudy.length > 0
+              ? [
+                  {
+                    $match: { "ModeOfStudy.en": { $in: modeOfStudy } },
                   },
                 ]
               : []),
             { $skip: (coursePage - 1) * courseLimit },
             { $limit: courseLimit },
-            // Project only the required fields for courses
             {
               $project: {
-                CourseName: 1, // Include only the courseName field
-                CourseDuration: 1, // Include only the courseDuration field
-                CourseFees: 1, // Include only the courseFees field
+                CourseName: 1,
+                CourseDuration: 1,
+                CourseFees: 1,
+                CourseDurationUnits: 1,
                 Languages: 1,
                 ModeOfStudy: 1,
                 DeadLine: 1,
@@ -133,21 +149,29 @@ const getUniversityByName = async (req, res) => {
           let: { majorIds: "$major" },
           pipeline: [
             { $match: { $expr: { $in: ["$_id", "$$majorIds"] } } },
-            ...(modeOfStudy
+            ...(studyLevel.length > 0
               ? [
                   {
-                    $match: { modeOfStudy: { $in: [modeOfStudy] } },
+                    $match: { studyLevel: { $in: studyLevel } },
+                  },
+                ]
+              : []),
+            ...(modeOfStudy.length > 0
+              ? [
+                  {
+                    $match: { modeOfStudy: { $in: modeOfStudy } },
                   },
                 ]
               : []),
             { $skip: (majorPage - 1) * majorLimit },
             { $limit: majorLimit },
-            // Project only the required fields for majors
             {
               $project: {
                 majorName: 1,
                 majorTuitionFees: 1,
                 studyLevel: 1,
+                duration: 1,
+                durationUnits: 1,
                 modeOfStudy: 1,
                 customURLSlug: 1,
               },
@@ -158,8 +182,10 @@ const getUniversityByName = async (req, res) => {
       },
       {
         $addFields: {
-          totalCourses: { $size: "$courseId" }, // Calculate total courses
-          totalMajors: { $size: "$major" }, // Calculate total majors
+          totalCourses: { $size: "$courseId" },
+          totalMajors: { $size: "$major" },
+          highestCourseTuitionFees: { $max: "$courses.CourseFees" }, // Highest course tuition fees
+          lowestCourseTuitionFees: { $min: "$courses.CourseFees" }, // Lowest course tuition fees
         },
       },
       {
@@ -181,7 +207,7 @@ const getUniversityByName = async (req, res) => {
           inTakeMonth: 1,
           inTakeYear: 1,
           entranceExamRequired: 1,
-          uniCountry: 1,
+          country: 1, // Include the populated country details
           scholarshipsAvailable: 1,
           scholarshipType: 1,
           scholarshipPercentage: 1,
@@ -205,6 +231,8 @@ const getUniversityByName = async (req, res) => {
           customURLSlug: 1,
           totalCourses: 1,
           totalMajors: 1,
+          highestCourseTuitionFees: 1,
+          lowestCourseTuitionFees: 1,
         },
       },
     ]);
