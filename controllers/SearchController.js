@@ -21,7 +21,7 @@ const getCountries = async (req, res) => {
 
     const countries = await countryModel
       .find(countryFilter) // If empty, fetches all
-      .select("_id countryName countryPhotos countryCode")
+      .select("_id countryName countryPhotos customURLSlug countryCode")
       .lean();
 
     res.status(200).json({ data: countries });
@@ -151,7 +151,7 @@ const getUniversitiesByCountries = async (req, res) => {
     const universities = await universityModel
       .find(universityFilter)
       .select(
-        "_id uniCountry uniName uniType studyLevel scholarshipAvailability uniDiscount uniTutionFees uniFeatured"
+        "_id uniCountry uniName customURLSlug uniType studyLevel scholarshipAvailability uniDiscount uniTutionFees uniFeatured"
       )
       .populate("uniCountry", "countryName countryPhotos countryCode")
       .skip(skip)
@@ -252,11 +252,11 @@ const getCoursesByUniversities = async (req, res) => {
     const courses = await courseModel
       .find(courseFilter)
       .select(
-        "CourseName CourseFees CourseDuration DeadLine ModeOfStudy Tags university"
+        "CourseName CourseFees CourseDuration DeadLine ModeOfStudy Tags customURLSlug university Languages"
       )
       .populate(
         "university",
-        "uniName uniType studyLevel uniTutionFees  uniFeatured"
+        "uniName uniType studyLevel  uniTutionFees  uniFeatured"
       )
       .skip(skip)
       .limit(limit)
@@ -291,7 +291,7 @@ const getBlogsByCountries = async (req, res) => {
     const skip = (page - 1) * limit;
 
     const blogs = await BlogModel.find({ blogCountry: { $in: countryIds } })
-      .select("blogTitle blogSubtitle blogAdded blogPhoto blogCountry")
+      .select("blogTitle blogSubtitle blogAdded customURLSlug blogPhoto blogCountry")
       .populate("blogCountry", "countryName countryPhotos countryCode")
       .limit(limit)
       .skip(skip)
