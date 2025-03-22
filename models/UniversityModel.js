@@ -53,6 +53,15 @@ const universitySchema = new Schema({
     type: Schema.Types.ObjectId,
     ref: "Country",
   },
+  scholarshipsAvailable: { type: Boolean },
+  scholarshipType: {
+    type: String,
+    enum: ["none", "partial", "full"],
+    default: "none",
+  },
+  scholarshipPercentage: { type: String },
+  DiscountAvailable: { type: Boolean },
+  DiscountValue: { type: String },
   campuses: [
     {
       campusName: { en: { type: String }, ar: { type: String } },
