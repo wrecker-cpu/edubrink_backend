@@ -2,6 +2,9 @@ const countryModel = require("../models/CountryModel");
 const universityModel = require("../models/UniversityModel");
 const courseModel = require("../models/CourseModel");
 const BlogModel = require("../models/BlogModel");
+const NodeCache = require("node-cache"); // You'll need to install this: npm install node-cache
+
+const queryCache = new NodeCache({ stdTTL: 600, checkperiod: 120 });
 
 // const getCountries = async (req, res) => {
 //   try {
@@ -315,9 +318,85 @@ const BlogModel = require("../models/BlogModel");
 //   }
 // };
 
+// Create cache instance with TTL of 10 minutes (600 seconds)
+
+// Helper function to generate cache keys from request parameters
+const generateCacheKey = (prefix, params) => {
+  // Sort the keys to ensure consistent cache keys regardless of parameter order
+  const sortedParams = Object.keys(params)
+    .sort()
+    .reduce((result, key) => {
+      result[key] = params[key];
+      return result;
+    }, {});
+
+  return `${prefix}:${JSON.stringify(sortedParams)}`;
+};
+
+// 1. Cached getCountries function
+const getCountries = async (req, res) => {
+  try {
+    const startTime = Date.now();
+
+    // Generate cache key based on filterProp
+    const cacheKey = generateCacheKey("countries", {
+      filterProp: req.query.filterProp || "",
+    });
+
+    // Check if we have cached results
+    const cachedResult = queryCache.get(cacheKey);
+    if (cachedResult) {
+      return res.status(200).json(cachedResult);
+    }
+
+    let filterProp = {};
+    if (req.query.filterProp) {
+      try {
+        filterProp = JSON.parse(decodeURIComponent(req.query.filterProp));
+      } catch (error) {
+        console.error("Error parsing filterProp:", error.message);
+      }
+    }
+
+    // Build query
+    const query = filterProp.Destination?.length
+      ? { "countryName.en": { $in: filterProp.Destination } }
+      : {};
+
+    const countries = await countryModel
+      .find(query)
+      .select("_id countryName countryPhotos customURLSlug countryCode")
+      .lean();
+
+    // Prepare response
+    const result = { data: countries };
+
+    // Store in cache
+    queryCache.set(cacheKey, result);
+
+    const endTime = Date.now();
+    console.log(`getCountries execution time: ${endTime - startTime}ms`);
+
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Error in getCountries:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// 2. Cached getUniversitiesByCountries function
 const getUniversitiesByCountries = async (req, res) => {
   try {
     const startTime = Date.now();
+
+    // Generate cache key from all query parameters
+    const cacheKey = generateCacheKey("universities", req.query);
+
+    // Check cache
+    const cachedResult = queryCache.get(cacheKey);
+    if (cachedResult) {
+      return res.status(200).json(cachedResult);
+    }
 
     const countryIds = req.query.countryIds
       ? req.query.countryIds.split(",")
@@ -362,16 +441,14 @@ const getUniversitiesByCountries = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    // OPTIMIZATION: If no course filtering needed, execute a simpler query
+    // Simple case - no course filtering needed
     if (!needsCourseFiltering) {
-      // Simple case - just query universities directly
       const totalUniversities = await universityModel.countDocuments(
         universityFilter
       );
 
-      // If no results, return early
       if (totalUniversities === 0) {
-        return res.status(200).json({
+        const emptyResult = {
           data: [],
           pagination: {
             page,
@@ -380,7 +457,10 @@ const getUniversitiesByCountries = async (req, res) => {
             totalPages: 0,
             hasMore: false,
           },
-        });
+        };
+
+        queryCache.set(cacheKey, emptyResult);
+        return res.status(200).json(emptyResult);
       }
 
       const universities = await universityModel
@@ -393,7 +473,7 @@ const getUniversitiesByCountries = async (req, res) => {
         .limit(limit)
         .lean();
 
-      return res.status(200).json({
+      const result = {
         data: universities,
         pagination: {
           page,
@@ -402,12 +482,13 @@ const getUniversitiesByCountries = async (req, res) => {
           hasMore: page * limit < totalUniversities,
           totalPages: Math.ceil(totalUniversities / limit),
         },
-      });
+      };
+
+      queryCache.set(cacheKey, result);
+      return res.status(200).json(result);
     }
 
     // Complex case - need to filter by course properties
-    // OPTIMIZATION: Use aggregation pipeline instead of separate queries
-
     // Build course match conditions
     const courseMatchConditions = { university: { $in: [] } }; // Will be populated with university IDs
 
@@ -475,15 +556,14 @@ const getUniversitiesByCountries = async (req, res) => {
       }
     }
 
-    // OPTIMIZATION: Get a limited set of university IDs first
-    // This is a key optimization - we first get just the IDs of universities that match our criteria
+    // Get university IDs first
     const matchingUniversities = await universityModel
       .find(universityFilter)
       .select("_id")
       .lean();
 
     if (matchingUniversities.length === 0) {
-      return res.status(200).json({
+      const emptyResult = {
         data: [],
         pagination: {
           page,
@@ -492,7 +572,10 @@ const getUniversitiesByCountries = async (req, res) => {
           totalPages: 0,
           hasMore: false,
         },
-      });
+      };
+
+      queryCache.set(cacheKey, emptyResult);
+      return res.status(200).json(emptyResult);
     }
 
     // Extract university IDs
@@ -512,14 +595,14 @@ const getUniversitiesByCountries = async (req, res) => {
       courseQuery.$and.push({ $or: orConditions });
     }
 
-    // OPTIMIZATION: Only get distinct university IDs from courses
+    // Get distinct university IDs from courses
     const matchingCourseUniversities = await courseModel.distinct(
       "university",
       courseQuery
     );
 
     if (matchingCourseUniversities.length === 0) {
-      return res.status(200).json({
+      const emptyResult = {
         data: [],
         pagination: {
           page,
@@ -528,7 +611,10 @@ const getUniversitiesByCountries = async (req, res) => {
           totalPages: 0,
           hasMore: false,
         },
-      });
+      };
+
+      queryCache.set(cacheKey, emptyResult);
+      return res.status(200).json(emptyResult);
     }
 
     // Final university query with the filtered IDs
@@ -553,9 +639,7 @@ const getUniversitiesByCountries = async (req, res) => {
       .limit(limit)
       .lean();
 
-    const endTime = Date.now();
-
-    res.status(200).json({
+    const result = {
       data: universities,
       pagination: {
         page,
@@ -564,17 +648,34 @@ const getUniversitiesByCountries = async (req, res) => {
         hasMore: page * limit < totalUniversities,
         totalPages: Math.ceil(totalUniversities / limit),
       },
-    });
+    };
+
+    // Store in cache
+    queryCache.set(cacheKey, result);
+
+    const endTime = Date.now();
+    console.log(`Query execution time: ${endTime - startTime}ms`);
+
+    res.status(200).json(result);
   } catch (error) {
     console.error("Error in getUniversitiesByCountries:", error);
     res.status(500).json({ message: error.message });
   }
 };
 
-// 3. Optimized getCoursesByUniversities
+// 3. Cached getCoursesByUniversities function
 const getCoursesByUniversities = async (req, res) => {
   try {
     const startTime = Date.now();
+
+    // Generate cache key
+    const cacheKey = generateCacheKey("courses", req.query);
+
+    // Check cache
+    const cachedResult = queryCache.get(cacheKey);
+    if (cachedResult) {
+      return res.status(200).json(cachedResult);
+    }
 
     const universityIds = req.query.universityIds
       ? req.query.universityIds.split(",")
@@ -603,7 +704,6 @@ const getCoursesByUniversities = async (req, res) => {
 
       if (max === undefined) max = Infinity;
 
-      // OPTIMIZATION: Use $or with specific conditions instead of array manipulation
       courseFilter.$or = [
         {
           CourseDurationUnits: "Years",
@@ -622,9 +722,7 @@ const getCoursesByUniversities = async (req, res) => {
 
     // Add mode of study filter
     if (req.query.ModeOfStudy) {
-      // OPTIMIZATION: If $or already exists, extend it; otherwise create it
       if (courseFilter.$or) {
-        // Create a new $and condition to combine existing $or with new $or
         courseFilter.$and = [
           { $or: courseFilter.$or },
           {
@@ -663,7 +761,6 @@ const getCoursesByUniversities = async (req, res) => {
             });
           }
 
-          // OPTIMIZATION: Combine with existing conditions properly
           if (courseFilter.$and) {
             courseFilter.$and.push({ $or: searchConditions });
           } else if (courseFilter.$or) {
@@ -686,11 +783,11 @@ const getCoursesByUniversities = async (req, res) => {
     const limit = parseInt(req.query.limit) || 5;
     const skip = (page - 1) * limit;
 
-    // OPTIMIZATION: Get count first to potentially avoid expensive query
+    // Get count first
     const totalCourses = await courseModel.countDocuments(courseFilter);
 
     if (totalCourses === 0) {
-      return res.status(200).json({
+      const emptyResult = {
         data: [],
         pagination: {
           page,
@@ -699,7 +796,10 @@ const getCoursesByUniversities = async (req, res) => {
           hasMore: false,
           totalPages: 0,
         },
-      });
+      };
+
+      queryCache.set(cacheKey, emptyResult);
+      return res.status(200).json(emptyResult);
     }
 
     // Get courses with pagination
@@ -716,10 +816,7 @@ const getCoursesByUniversities = async (req, res) => {
       .limit(limit)
       .lean();
 
-    const endTime = Date.now();
-    console.log(`Query execution time: ${endTime - startTime}ms`);
-
-    res.status(200).json({
+    const result = {
       data: courses,
       pagination: {
         page,
@@ -728,50 +825,34 @@ const getCoursesByUniversities = async (req, res) => {
         hasMore: page * limit < totalCourses,
         totalPages: Math.ceil(totalCourses / limit),
       },
-    });
+    };
+
+    // Store in cache
+    queryCache.set(cacheKey, result);
+
+    const endTime = Date.now();
+    console.log(`Query execution time: ${endTime - startTime}ms`);
+
+    res.status(200).json(result);
   } catch (error) {
     console.error("Error in getCoursesByUniversities:", error);
     res.status(500).json({ message: error.message });
   }
 };
 
-// 4. Simplified getCountries and getBlogsByCountries
-const getCountries = async (req, res) => {
-  try {
-    const startTime = Date.now();
-
-    let filterProp = {};
-    if (req.query.filterProp) {
-      try {
-        filterProp = JSON.parse(decodeURIComponent(req.query.filterProp));
-      } catch (error) {
-        console.error("Error parsing filterProp:", error.message);
-      }
-    }
-
-    // Build query
-    const query = filterProp.Destination?.length
-      ? { "countryName.en": { $in: filterProp.Destination } }
-      : {};
-
-    // OPTIMIZATION: Use lean() and specific field selection
-    const countries = await countryModel
-      .find(query)
-      .select("_id countryName countryPhotos customURLSlug countryCode")
-      .lean();
-
-    const endTime = Date.now();
-
-    res.status(200).json({ data: countries });
-  } catch (error) {
-    console.error("Error in getCountries:", error);
-    res.status(500).json({ message: error.message });
-  }
-};
-
+// 4. Cached getBlogsByCountries function
 const getBlogsByCountries = async (req, res) => {
   try {
     const startTime = Date.now();
+
+    // Generate cache key
+    const cacheKey = generateCacheKey("blogs", req.query);
+
+    // Check cache
+    const cachedResult = queryCache.get(cacheKey);
+    if (cachedResult) {
+      return res.status(200).json(cachedResult);
+    }
 
     const countryIds = req.query.countryIds
       ? req.query.countryIds.split(",")
@@ -784,13 +865,13 @@ const getBlogsByCountries = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    // OPTIMIZATION: Get count first
+    // Get count first
     const totalBlogs = await BlogModel.countDocuments({
       blogCountry: { $in: countryIds },
     });
 
     if (totalBlogs === 0) {
-      return res.status(200).json({
+      const emptyResult = {
         data: [],
         pagination: {
           page,
@@ -798,7 +879,10 @@ const getBlogsByCountries = async (req, res) => {
           totalBlogs: 0,
           totalPages: 0,
         },
-      });
+      };
+
+      queryCache.set(cacheKey, emptyResult);
+      return res.status(200).json(emptyResult);
     }
 
     // Get blogs with pagination
@@ -811,9 +895,7 @@ const getBlogsByCountries = async (req, res) => {
       .limit(limit)
       .lean();
 
-    const endTime = Date.now();
-
-    res.status(200).json({
+    const result = {
       data: blogs,
       pagination: {
         page,
@@ -821,11 +903,66 @@ const getBlogsByCountries = async (req, res) => {
         totalBlogs,
         totalPages: Math.ceil(totalBlogs / limit),
       },
-    });
+    };
+
+    // Store in cache
+    queryCache.set(cacheKey, result);
+
+    const endTime = Date.now();
+    console.log(`getBlogsByCountries execution time: ${endTime - startTime}ms`);
+
+    res.status(200).json(result);
   } catch (error) {
     console.error("Error in getBlogsByCountries:", error);
     res.status(500).json({ message: error.message });
   }
+};
+
+// Cache management functions
+const clearCache = (req, res) => {
+  try {
+    queryCache.flushAll();
+    res.status(200).json({ message: "Cache cleared successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const clearCacheByPattern = (req, res) => {
+  try {
+    const pattern = req.params.pattern;
+    if (!pattern) {
+      return res.status(400).json({ message: "Pattern is required" });
+    }
+
+    const keys = queryCache.keys();
+    let count = 0;
+
+    keys.forEach((key) => {
+      if (key.startsWith(pattern)) {
+        queryCache.del(key);
+        count++;
+      }
+    });
+
+    res
+      .status(200)
+      .json({
+        message: `Cleared ${count} cache entries matching pattern: ${pattern}`,
+      });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Function to invalidate cache when data changes
+const invalidateCache = (prefix) => {
+  const keys = queryCache.keys();
+  keys.forEach((key) => {
+    if (key.startsWith(prefix)) {
+      queryCache.del(key);
+    }
+  });
 };
 
 module.exports = {
