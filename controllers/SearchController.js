@@ -466,7 +466,7 @@ const getUniversitiesByCountries = async (req, res) => {
       const universities = await universityModel
         .find(universityFilter)
         .select(
-          "_id uniCountry uniName customURLSlug uniType studyLevel scholarshipAvailability uniDiscount uniTutionFees uniFeatured"
+          "_id uniCountry uniName uniSymbol customURLSlug uniType studyLevel scholarshipAvailability uniDiscount uniTutionFees uniFeatured"
         )
         .populate("uniCountry", "countryName countryPhotos countryCode")
         .skip(skip)
@@ -632,7 +632,7 @@ const getUniversitiesByCountries = async (req, res) => {
     const universities = await universityModel
       .find(finalUniversityFilter)
       .select(
-        "_id uniCountry uniName customURLSlug uniType studyLevel scholarshipAvailability uniDiscount uniTutionFees uniFeatured"
+        "_id uniCountry uniName uniSymbol customURLSlug uniType studyLevel scholarshipAvailability uniDiscount uniTutionFees uniFeatured"
       )
       .populate("uniCountry", "countryName countryPhotos countryCode")
       .skip(skip)
@@ -945,11 +945,9 @@ const clearCacheByPattern = (req, res) => {
       }
     });
 
-    res
-      .status(200)
-      .json({
-        message: `Cleared ${count} cache entries matching pattern: ${pattern}`,
-      });
+    res.status(200).json({
+      message: `Cleared ${count} cache entries matching pattern: ${pattern}`,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
