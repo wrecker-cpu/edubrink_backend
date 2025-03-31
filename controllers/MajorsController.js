@@ -93,10 +93,15 @@ const getAllMajors = async (req, res) => {
       page,
       limit,
       search,
+      majorTuitionFees,
+      majorTuitionFeesMin,
+      majorTuitionFeesMax,
       scholarships,
       featured,
       duration,
       durationUnit,
+      sortBy,
+      sortDirection,
     } = req.query;
 
     // Parse query parameters
@@ -106,6 +111,8 @@ const getAllMajors = async (req, res) => {
 
     // Build the query for filtering
     const query = {};
+    
+    // Handle search term
     if (search) {
       // Step 1: Fetch matching universities based on the search term
       const matchingUniversities = await UniversityModel.find(
@@ -123,6 +130,26 @@ const getAllMajors = async (req, res) => {
       ];
     }
 
+    // Handle tuition fees (as numeric values, not regex)
+    if (majorTuitionFees) {
+      // Exact match for tuition fees
+      query.majorTuitionFees = parseFloat(majorTuitionFees);
+    } else {
+      // Handle min/max ranges if provided
+      if (majorTuitionFeesMin || majorTuitionFeesMax) {
+        query.majorTuitionFees = {};
+        
+        if (majorTuitionFeesMin) {
+          query.majorTuitionFees.$gte = parseFloat(majorTuitionFeesMin);
+        }
+        
+        if (majorTuitionFeesMax) {
+          query.majorTuitionFees.$lte = parseFloat(majorTuitionFeesMax);
+        }
+      }
+    }
+
+    // Handle other filters
     if (scholarships === "true") {
       query["majorCheckBox.scholarshipsAvailable"] = true;
     }
@@ -138,12 +165,29 @@ const getAllMajors = async (req, res) => {
       }
     }
 
+    // Build sort options
+    const sortOptions = {};
+    if (sortBy) {
+      // Handle different sort fields
+      if (sortBy === "name") {
+        sortOptions["majorName.en"] = sortDirection === "desc" ? -1 : 1;
+      } else if (sortBy === "duration") {
+        sortOptions.duration = sortDirection === "desc" ? -1 : 1;
+      } else if (sortBy === "tuition") {
+        sortOptions.majorTuitionFees = sortDirection === "desc" ? -1 : 1;
+      } else {
+        // Default sort
+        sortOptions[sortBy] = sortDirection === "desc" ? -1 : 1;
+      }
+    }
+
     // Fetch majors with pagination, filtering, and populate the `university` field
     const majors = await MajorsModel.find(query)
       .populate({
         path: "university", // Populate the `university` field
         select: "uniName", // Only fetch the `uniName` field
       })
+      .sort(sortOptions) // Apply sorting
       .skip(skip) // Skip documents for pagination
       .limit(parsedLimit) // Limit the number of documents
       .lean(); // Convert to plain JavaScript objects

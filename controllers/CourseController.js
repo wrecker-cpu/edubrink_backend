@@ -62,7 +62,17 @@ const getCourseById = async (req, res) => {
     // Find course and populate university field
     const courseData = await courseModel
       .findOne(matchCondition)
-      .populate("university", "uniName uniSymbol customURLSlug");
+      // .populate("university", "uniName uniSymbol customURLSlug");
+      .populate({
+        path: "university",
+        select: "uniName uniSymbol customURLSlug",
+        populate: {
+          path: "courseId", // Assuming "courses" is the field inside the university schema
+          model: "Course", // Replace "Course" with your actual course model name
+          select: "CourseName customURLSlug CourseFees Languages DeadLine", // Select only necessary fields
+          options: { limit: 5 }, // Limit courses to 5
+        },
+      });
 
     if (!courseData) {
       return res.status(404).json({ message: "Course not found" });
@@ -86,6 +96,7 @@ const getAllCourses = async (req, res) => {
       discount,
       duration,
       durationUnit,
+      courseFees, // Add this parameter
     } = req.query;
 
     // Check if the `all` query parameter is set to true
@@ -104,7 +115,10 @@ const getAllCourses = async (req, res) => {
     const query = {};
     if (search) {
       // Add search condition to the query for `courseName.en`
-      query.$or = [{ "CourseName.en": { $regex: search, $options: "i" } }];
+      query.$or = [
+        { "CourseName.en": { $regex: search, $options: "i" } },
+        { CourseFees: { $regex: search, $options: "i" } },
+      ];
 
       // If searching in `university.uniName.en`, fetch matching universities first
       const matchingUniversities = await universityModel.find(
@@ -118,6 +132,15 @@ const getAllCourses = async (req, res) => {
       // Add the matching university IDs to the query
       if (universityIds.length > 0) {
         query.$or.push({ university: { $in: universityIds } });
+      }
+    }
+
+    // Handle course fees search (exact match)
+    if (courseFees) {
+      const parsedFees = parseFloat(courseFees);
+      if (!isNaN(parsedFees)) {
+        // Use exact match for fees instead of regex
+        query.CourseFees = parsedFees;
       }
     }
 
@@ -353,25 +376,6 @@ const getAllCoursesWithUniNames = async (req, res) => {
   }
 };
 
-// const getcourseByName = async (req, res) => {
-//   const name = req.params.name; // Assume 'name' is passed as a route parameter
-//   try {
-//     // Find the course by name
-//     const courseData = await courseModel
-//       .findOne({ "courseName": name })
-//       .lean();
-
-//     if (!courseData) {
-//       return res.status(404).json({ message: "course not found" });
-//     }
-//     res.status(200).json({ data: courseData });
-//   } catch (err) {
-//     res.status(500).json({ message: err.message });
-//   }
-// };
-
-// Update a course by ID
-
 const updateCourse = async (req, res) => {
   const id = req.params.id;
   try {
@@ -421,7 +425,6 @@ const updateCourse = async (req, res) => {
   }
 };
 
-// Delete a course by ID
 const deleteCourse = async (req, res) => {
   const id = req.params.id;
   try {
