@@ -580,9 +580,25 @@ const updateUniversity = async (req, res) => {
     }
 
     if (major) {
+      // First, remove university reference from all majors that reference this university
       await MajorsModel.updateMany(
-        { _id: { $in: major } }, // Filter: Only update the specified majors
-        { $unset: { university: "" } } // Action: Remove the university reference
+        { university: id },
+        { $unset: { university: "" } }
+      );
+      
+      // Then, set university reference for the majors in the provided array
+      if (major.length > 0) {
+        await MajorsModel.updateMany(
+          { _id: { $in: major } },
+          { $set: { university: id } }
+        );
+      }
+    } else {
+      // If no major array is provided, remove university reference from all majors
+      // that reference this university
+      await MajorsModel.updateMany(
+        { university: id },
+        { $unset: { university: "" } }
       );
     }
 
