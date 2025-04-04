@@ -114,21 +114,27 @@ const getAllCourses = async (req, res) => {
     // Build the query for filtering
     const query = {};
     if (search) {
-      // Add search condition to the query for `courseName.en`
+      // Add search condition to the query for `courseName.en` only
       query.$or = [
-        { "CourseName.en": { $regex: search, $options: "i" } },
-        { CourseFees: { $regex: search, $options: "i" } },
+        { "CourseName.en": { $regex: search, $options: "i" } }
       ];
-
+    
+      // Try to parse the search as a number for CourseFees
+      const searchAsNumber = parseFloat(search);
+      if (!isNaN(searchAsNumber)) {
+        // If search can be converted to a number, add it to the $or conditions
+        query.$or.push({ CourseFees: searchAsNumber });
+      }
+    
       // If searching in `university.uniName.en`, fetch matching universities first
       const matchingUniversities = await universityModel.find(
         { "uniName.en": { $regex: search, $options: "i" } },
         { _id: 1 } // Only fetch the `_id` field
       );
-
+    
       // Extract the `_id`s of matching universities
       const universityIds = matchingUniversities.map((uni) => uni._id);
-
+    
       // Add the matching university IDs to the query
       if (universityIds.length > 0) {
         query.$or.push({ university: { $in: universityIds } });

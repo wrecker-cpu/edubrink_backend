@@ -224,24 +224,6 @@ const updateMajors = async (req, res) => {
       return res.status(404).json({ message: "Major not found" });
     }
 
-    // Step 2: If faculty is updated, adjust references
-    if (faculty && faculty.toString() !== existingMajor.faculty?.toString()) {
-      // Remove major ID from old faculty
-      if (existingMajor.faculty) {
-        await FacultyModel.findByIdAndUpdate(existingMajor.faculty, {
-          $pull: { major: id },
-        });
-      }
-
-      // Add major ID to the new faculty
-      await FacultyModel.findByIdAndUpdate(faculty, {
-        $addToSet: { major: id }, // Avoid duplicates
-      });
-
-      // Update the major with new faculty reference
-      majorDetails.faculty = faculty;
-    }
-
     // Step 3: If university is updated, adjust references
     if (
       university &&
