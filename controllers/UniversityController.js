@@ -6,6 +6,7 @@ const courseModel = require("../models/CourseModel");
 const FacultyModel = require("../models/FacultyModel");
 const { createNotification } = require("../controllers/HelperController");
 const MajorsModel = require("../models/MajorsModel");
+const { clearCache } = require("../controllers/SearchController");
 
 // Create a new University
 const createUniversity = async (req, res) => {
@@ -539,77 +540,68 @@ const getUniversitiesLimitedQuery = async (req, res) => {
 
 // Update a University by ID
 const updateUniversity = async (req, res) => {
-  const id = req.params.id;
+  const id = req.params.id
   try {
-    const { uniCountry, courseId, major, ...universityDetails } = req.body;
+    const { uniCountry, courseId, major, ...universityDetails } = req.body
+
+    // First, get the current university to check its current country
+    const currentUniversity = await universityModel.findById(id).lean()
+
+    if (!currentUniversity) {
+      return res.status(404).json({ message: "University not found" })
+    }
 
     // Step 1: Find and update the university
     const updatedUniversity = await universityModel
-      .findByIdAndUpdate(
-        id,
-        { ...universityDetails, courseId, uniCountry, major },
-        { new: true }
-      )
-      .lean();
+      .findByIdAndUpdate(id, { ...universityDetails, courseId, uniCountry, major }, { new: true })
+      .lean()
 
-    if (!updatedUniversity) {
-      return res.status(404).json({ message: "University not found" });
-    }
+    await createNotification("University", updatedUniversity, "uniName", "updated")
 
-    await createNotification(
-      "University",
-      updatedUniversity,
-      "uniName",
-      "updated"
-    );
-
-    // Step 2: If uniCountry is provided, update the Country model
+    // Step 2: Handle country relationships
     if (uniCountry) {
+      // If the university was previously associated with a different country,
+      // remove it from that country
+      if (currentUniversity.uniCountry && currentUniversity.uniCountry.toString() !== uniCountry.toString()) {
+        await countryModel.findByIdAndUpdate(currentUniversity.uniCountry, { $pull: { universities: id } })
+      }
+
+      // Add the university to the new country
       await countryModel.findByIdAndUpdate(
         uniCountry,
         { $addToSet: { universities: updatedUniversity._id } },
-        { new: true }
-      );
+        { new: true },
+      )
     }
 
     if (courseId) {
-      await courseModel.updateMany(
-        { university: id, _id: { $nin: courseId } },
-        { $unset: { university: "" } }
-      );
+      await courseModel.updateMany({ university: id, _id: { $nin: courseId } }, { $unset: { university: "" } })
     }
 
     if (major) {
       // First, remove university reference from all majors that reference this university
-      await MajorsModel.updateMany(
-        { university: id },
-        { $unset: { university: "" } }
-      );
-      
+      await MajorsModel.updateMany({ university: id }, { $unset: { university: "" } })
+
       // Then, set university reference for the majors in the provided array
       if (major.length > 0) {
-        await MajorsModel.updateMany(
-          { _id: { $in: major } },
-          { $set: { university: id } }
-        );
+        await MajorsModel.updateMany({ _id: { $in: major } }, { $set: { university: id } })
       }
     } else {
       // If no major array is provided, remove university reference from all majors
       // that reference this university
-      await MajorsModel.updateMany(
-        { university: id },
-        { $unset: { university: "" } }
-      );
+      await MajorsModel.updateMany({ university: id }, { $unset: { university: "" } })
     }
 
+    const clearCache = true
     res.status(200).json({
       data: updatedUniversity,
       message: "University updated successfully and linked to country!",
-    });
+      clearCache,
+    })
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: err.message })
   }
-};
+}
 
 // Delete a University by ID
 
