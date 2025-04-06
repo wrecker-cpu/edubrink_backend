@@ -6,341 +6,81 @@ const NodeCache = require("node-cache"); // You'll need to install this: npm ins
 
 const queryCache = new NodeCache({ stdTTL: 600, checkperiod: 120 });
 
-// const getCountries = async (req, res) => {
-//   try {
-//     let filterProp = {};
-//     if (req.query.filterProp) {
-//       try {
-//         filterProp = JSON.parse(decodeURIComponent(req.query.filterProp));
-//       } catch (error) {
-//         console.error("Error parsing filterProp:", error.message);
-//       }
-//     }
-
-//     // ✅ If no Destination filter is provided, return all countries
-//     const countryFilter = filterProp.Destination?.length
-//       ? { "countryName.en": { $in: filterProp.Destination } }
-//       : {}; // Empty filter means fetch all
-
-//     const countries = await countryModel
-//       .find(countryFilter) // If empty, fetches all
-//       .select("_id countryName countryPhotos customURLSlug countryCode")
-//       .lean();
-
-//     res.status(200).json({ data: countries });
-//   } catch (error) {
-//     res.status(500).json({ message: error.message });
-//   }
-// };
-
-// const getUniversitiesByCountries = async (req, res) => {
-//   try {
-//     const countryIds = req.query.countryIds
-//       ? req.query.countryIds.split(",")
-//       : [];
-//     if (!countryIds.length)
-//       return res.status(400).json({ message: "No country IDs provided" });
-
-//     let universityFilter = { uniCountry: { $in: countryIds } };
-
-//     if (req.query.StudyLevel && req.query.StudyLevel !== "All") {
-//       universityFilter.studyLevel = { $in: [req.query.StudyLevel] };
-//     }
-//     if (req.query.EntranceExam) {
-//       universityFilter.entranceExamRequired = req.query.EntranceExam;
-//     }
-//     if (req.query.UniType) {
-//       universityFilter.uniType = {
-//         $regex: new RegExp(`^${req.query.UniType}$`, "i"),
-//       };
-//     }
-//     if (req.query.IntakeYear) {
-//       universityFilter.inTakeYear = req.query.IntakeYear;
-//     }
-//     if (req.query.IntakeMonth) {
-//       universityFilter.inTakeMonth = req.query.IntakeMonth;
-//     }
-
-//     // **New Step: Filter Universities Based on Matching Courses**
-//     let courseFilter = {};
-//     if (req.query.minBudget || req.query.maxBudget) {
-//       courseFilter.CourseFees = {
-//         $gte: Number(req.query.minBudget) || 0,
-//         $lte: Number(req.query.maxBudget) || Infinity,
-//       };
-//     }
-//     if (req.query.ModeOfStudy) {
-//       courseFilter.$or = [
-//         { "ModeOfStudy.en": req.query.ModeOfStudy },
-//         { "ModeOfStudy.ar": req.query.ModeOfStudy },
-//       ];
-//     }
-
-//     if (req.query.CourseDuration) {
-//       let [min, max] = req.query.CourseDuration.includes("+")
-//         ? [Number(req.query.CourseDuration.replace("+", "")), Infinity] // Handle "60+" as "60-Infinity"
-//         : req.query.CourseDuration.split("-").map(Number);
-
-//       if (max === undefined) max = Infinity; // Default max to Infinity if not provided
-
-//       // ✅ Ensure $or is an array inside courseFilter before pushing conditions
-//       courseFilter.$or = courseFilter.$or || [];
-
-//       courseFilter.$or.push(
-//         {
-//           CourseDurationUnits: "Years",
-//           CourseDuration: { $gte: min / 12, $lte: max / 12 },
-//         },
-//         {
-//           CourseDurationUnits: "Months",
-//           CourseDuration: { $gte: min, $lte: max },
-//         },
-//         {
-//           CourseDurationUnits: "Weeks",
-//           CourseDuration: { $gte: min / 0.23, $lte: max / 0.23 },
-//         }
-//       );
-//     }
-//     if (req.query.searchQuery) {
-//       try {
-//         const searchQuery = JSON.parse(req.query.searchQuery);
-//         courseFilter.$or = courseFilter.$or || [];
-
-//         if (searchQuery.en) {
-//           courseFilter.$or.push({
-//             "Tags.en": { $regex: searchQuery.en, $options: "i" },
-//           });
-//         }
-//         if (searchQuery.ar) {
-//           courseFilter.$or.push({
-//             "Tags.ar": { $regex: searchQuery.ar, $options: "i" },
-//           });
-//         }
-//       } catch (error) {
-//         console.error("Error parsing searchQuery:", error.message);
-//       }
-//     }
-
-//     // **Find universities that have at least one course matching the course filters**
-//     if (Object.keys(courseFilter).length > 0) {
-//       const matchingCourses = await courseModel
-//         .find(courseFilter)
-//         .select("university")
-//         .lean();
-//       const universityIds = matchingCourses
-//         .filter((course) => course.university) // ✅ Remove null values
-//         .map((course) => course.university.toString());
-
-//       if (universityIds.length === 0) {
-//         return res.status(200).json({
-//           data: [],
-//           pagination: {
-//             page: 1,
-//             limit: 10,
-//             totalUniversities: 0,
-//             totalPages: 0,
-//             hasMore: false,
-//           },
-//         });
-//       }
-//       universityFilter._id = { $in: universityIds };
-//     }
-
-//     // **Pagination**
-//     const page = parseInt(req.query.page) || 1;
-//     const limit = parseInt(req.query.limit) || 10;
-//     const skip = (page - 1) * limit;
-
-//     const universities = await universityModel
-//       .find(universityFilter)
-//       .select(
-//         "_id uniCountry uniName customURLSlug uniType studyLevel scholarshipAvailability uniDiscount uniTutionFees uniFeatured"
-//       )
-//       .populate("uniCountry", "countryName countryPhotos countryCode")
-//       .skip(skip)
-//       .limit(limit)
-//       .lean();
-
-//     const totalUniversities = await universityModel.countDocuments(
-//       universityFilter
-//     );
-
-//     res.status(200).json({
-//       data: universities,
-//       pagination: {
-//         page,
-//         limit,
-//         totalUniversities,
-//         hasMore: page * limit < totalUniversities,
-//         totalPages: Math.ceil(totalUniversities / limit),
-//       },
-//     });
-//   } catch (error) {
-//     res.status(500).json({ message: error.message });
-//   }
-// };
-
-// const getCoursesByUniversities = async (req, res) => {
-//   try {
-//     const universityIds = req.query.universityIds
-//       ? req.query.universityIds.split(",")
-//       : [];
-//     if (!universityIds.length)
-//       return res.status(400).json({ message: "No university IDs provided" });
-
-//     let courseFilter = { university: { $in: universityIds } };
-
-//     if (req.query.minBudget || req.query.maxBudget) {
-//       courseFilter.CourseFees = {
-//         $gte: Number(req.query.minBudget) || 0,
-//         $lte: Number(req.query.maxBudget) || Infinity,
-//       };
-//     }
-
-//     // Initialize $or filter array
-//     let orConditions = [];
-//     if (req.query.CourseDuration) {
-//       let [min, max] = req.query.CourseDuration.includes("+")
-//         ? [Number(req.query.CourseDuration.replace("+", "")), Infinity] // Handle "60+" as "60-Infinity"
-//         : req.query.CourseDuration.split("-").map(Number);
-
-//       if (max === undefined) max = Infinity; // Default max to Infinity if not provided
-
-//       orConditions.push(
-//         {
-//           CourseDurationUnits: "Years",
-//           CourseDuration: { $gte: min / 12, $lte: max / 12 },
-//         },
-//         {
-//           CourseDurationUnits: "Months",
-//           CourseDuration: { $gte: min, $lte: max },
-//         },
-//         {
-//           CourseDurationUnits: "Weeks",
-//           CourseDuration: { $gte: min / 0.23, $lte: max / 0.23 },
-//         }
-//       );
-//     }
-
-//     if (req.query.ModeOfStudy) {
-//       courseFilter.$or = [
-//         { "ModeOfStudy.en": req.query.ModeOfStudy },
-//         { "ModeOfStudy.ar": req.query.ModeOfStudy },
-//       ];
-//     }
-
-//     if (req.query.searchQuery) {
-//       const searchQuery = JSON.parse(req.query.searchQuery);
-//       if (searchQuery.en || searchQuery.ar) {
-//         orConditions.push(
-//           searchQuery.en
-//             ? { "Tags.en": { $regex: searchQuery.en, $options: "i" } }
-//             : null,
-//           searchQuery.ar
-//             ? { "Tags.ar": { $regex: searchQuery.ar, $options: "i" } }
-//             : null
-//         );
-//       }
-//     }
-
-//     // Apply $or filter if it has conditions
-//     if (orConditions.length > 0) {
-//       courseFilter.$or = orConditions.filter(Boolean); // Remove null values
-//     }
-
-//     const page = parseInt(req.query.page) || 1;
-//     const limit = parseInt(req.query.limit) || 5;
-//     const skip = (page - 1) * limit;
-
-//     const courses = await courseModel
-//       .find(courseFilter)
-//       .select(
-//         "CourseName CourseFees CourseDuration DeadLine ModeOfStudy Tags customURLSlug university Languages"
-//       )
-//       .populate(
-//         "university",
-//         "uniName uniType studyLevel  uniTutionFees  uniFeatured"
-//       )
-//       .skip(skip)
-//       .limit(limit)
-//       .lean();
-
-//     const totalCourses = await courseModel.countDocuments(courseFilter);
-//     res.status(200).json({
-//       data: courses,
-//       pagination: {
-//         page,
-//         limit,
-//         totalCourses,
-//         hasMore: page * limit < totalCourses, // ✅ Check if there are more courses
-//         totalPages: Math.ceil(totalCourses / limit),
-//       },
-//     });
-//   } catch (error) {
-//     res.status(500).json({ message: error.message });
-//   }
-// };
-
-// const getBlogsByCountries = async (req, res) => {
-//   try {
-//     const countryIds = req.query.countryIds
-//       ? req.query.countryIds.split(",")
-//       : [];
-//     if (!countryIds.length)
-//       return res.status(400).json({ message: "No country IDs provided" });
-
-//     const page = parseInt(req.query.page) || 1;
-//     const limit = parseInt(req.query.limit) || 10;
-//     const skip = (page - 1) * limit;
-
-//     const blogs = await BlogModel.find({ blogCountry: { $in: countryIds } })
-//       .select("blogTitle blogSubtitle blogAdded customURLSlug blogPhoto blogCountry")
-//       .populate("blogCountry", "countryName countryPhotos countryCode")
-//       .limit(limit)
-//       .skip(skip)
-//       .lean();
-
-//     const totalBlogs = await BlogModel.countDocuments({
-//       blogCountry: { $in: countryIds },
-//     });
-
-//     res.status(200).json({
-//       data: blogs,
-//       pagination: {
-//         page,
-//         limit,
-//         totalBlogs,
-//         totalPages: Math.ceil(totalBlogs / limit),
-//       },
-//     });
-//   } catch (error) {
-//     res.status(500).json({ message: error.message });
-//   }
-// };
-
-// Create cache instance with TTL of 10 minutes (600 seconds)
-
-// Helper function to generate cache keys from request parameters
+// Modified generateCacheKey function to handle filterProp properly
 const generateCacheKey = (prefix, params) => {
+  // Create a copy of params to avoid modifying the original
+  const processedParams = { ...params };
+
+  // Special handling for filterProp - handle both string and object formats
+  if (processedParams.filterProp) {
+    try {
+      // Check if filterProp is a string that needs parsing
+      if (typeof processedParams.filterProp === "string") {
+        try {
+          // Try to parse it as JSON
+          const parsedFilterProp = JSON.parse(
+            decodeURIComponent(processedParams.filterProp)
+          );
+          processedParams.filterProp = JSON.stringify(parsedFilterProp);
+        } catch (error) {
+          // If it's not valid JSON, just use it as is
+          console.error("Error parsing filterProp string:", error.message);
+        }
+      } else {
+        // It's already an object, just stringify it
+        processedParams.filterProp = JSON.stringify(processedParams.filterProp);
+      }
+    } catch (error) {
+      console.error(
+        "Error processing filterProp for cache key:",
+        error.message
+      );
+    }
+  }
+
   // Sort the keys to ensure consistent cache keys regardless of parameter order
-  const sortedParams = Object.keys(params)
+  const sortedParams = Object.keys(processedParams)
     .sort()
     .reduce((result, key) => {
-      result[key] = params[key];
+      result[key] = processedParams[key];
       return result;
     }, {});
 
   return `${prefix}:${JSON.stringify(sortedParams)}`;
 };
 
-// 1. Cached getCountries function
+// Modified getCountries function
 const getCountries = async (req, res) => {
   try {
     const startTime = Date.now();
 
-    // Generate cache key based on filterProp
+    // Parse filterProp first to ensure cache key is based on parsed content
+    let parsedFilterProp = {};
+    if (req.query.filterProp) {
+      try {
+        // Check if filterProp is a string that needs parsing
+        if (typeof req.query.filterProp === "string") {
+          try {
+            parsedFilterProp = JSON.parse(
+              decodeURIComponent(req.query.filterProp)
+            );
+          } catch (error) {
+            console.error("Error parsing filterProp string:", error.message);
+            // If it can't be parsed, use it as is (might be an empty object)
+            parsedFilterProp = {};
+          }
+        } else {
+          // It's already an object
+          parsedFilterProp = req.query.filterProp;
+        }
+      } catch (error) {
+        console.error("Error handling filterProp:", error.message);
+      }
+    }
+
+    // Generate cache key based on parsed filterProp
     const cacheKey = generateCacheKey("countries", {
-      filterProp: req.query.filterProp || "",
+      filterProp: parsedFilterProp,
     });
 
     // Check if we have cached results
@@ -349,18 +89,9 @@ const getCountries = async (req, res) => {
       return res.status(200).json(cachedResult);
     }
 
-    let filterProp = {};
-    if (req.query.filterProp) {
-      try {
-        filterProp = JSON.parse(decodeURIComponent(req.query.filterProp));
-      } catch (error) {
-        console.error("Error parsing filterProp:", error.message);
-      }
-    }
-
     // Build query
-    const query = filterProp.Destination?.length
-      ? { "countryName.en": { $in: filterProp.Destination } }
+    const query = parsedFilterProp.Destination?.length
+      ? { "countryName.en": { $in: parsedFilterProp.Destination } }
       : {};
 
     const countries = await countryModel
@@ -373,9 +104,6 @@ const getCountries = async (req, res) => {
 
     // Store in cache
     queryCache.set(cacheKey, result);
-
-    const endTime = Date.now();
-    console.log(`getCountries execution time: ${endTime - startTime}ms`);
 
     res.status(200).json(result);
   } catch (error) {
@@ -408,33 +136,38 @@ const getUniversitiesByCountries = async (req, res) => {
     // Build the university filter
     const universityFilter = { uniCountry: { $in: countryIds } };
 
-    if (req.query.StudyLevel && req.query.StudyLevel !== "All") {
+    // Only add filters if they have valid non-empty values
+    if (
+      req.query.StudyLevel &&
+      req.query.StudyLevel !== "All" &&
+      req.query.StudyLevel !== ""
+    ) {
       universityFilter.studyLevel = { $in: [req.query.StudyLevel] };
     }
 
-    if (req.query.EntranceExam) {
+    if (req.query.EntranceExam && req.query.EntranceExam !== "") {
       universityFilter.entranceExamRequired = req.query.EntranceExam === "true";
     }
 
-    if (req.query.UniType) {
+    if (req.query.UniType && req.query.UniType !== "") {
       universityFilter.uniType = req.query.UniType;
     }
 
-    if (req.query.IntakeYear) {
+    if (req.query.IntakeYear && req.query.IntakeYear !== "") {
       universityFilter.inTakeYear = req.query.IntakeYear;
     }
 
-    if (req.query.IntakeMonth) {
+    if (req.query.IntakeMonth && req.query.IntakeMonth !== "") {
       universityFilter.inTakeMonth = req.query.IntakeMonth;
     }
 
-    // Check if we need course filtering
+    // Check if we need course filtering - only consider non-empty values
     const needsCourseFiltering =
-      req.query.minBudget ||
-      req.query.maxBudget ||
-      req.query.ModeOfStudy ||
-      req.query.CourseDuration ||
-      req.query.searchQuery;
+      (req.query.minBudget && req.query.minBudget !== "") ||
+      (req.query.maxBudget && req.query.maxBudget !== "") ||
+      (req.query.ModeOfStudy && req.query.ModeOfStudy !== "") ||
+      (req.query.CourseDuration && req.query.CourseDuration !== "") ||
+      (req.query.searchQuery && req.query.searchQuery !== "");
 
     // Pagination
     const page = parseInt(req.query.page) || 1;
@@ -490,71 +223,7 @@ const getUniversitiesByCountries = async (req, res) => {
 
     // Complex case - need to filter by course properties
     // Build course match conditions
-    const courseMatchConditions = { university: { $in: [] } }; // Will be populated with university IDs
-
-    if (req.query.minBudget || req.query.maxBudget) {
-      courseMatchConditions.CourseFees = {};
-      if (req.query.minBudget)
-        courseMatchConditions.CourseFees.$gte = Number(req.query.minBudget);
-      if (req.query.maxBudget)
-        courseMatchConditions.CourseFees.$lte = Number(req.query.maxBudget);
-    }
-
-    // Handle course duration
-    let durationConditions = [];
-    if (req.query.CourseDuration) {
-      let [min, max] = req.query.CourseDuration.includes("+")
-        ? [Number(req.query.CourseDuration.replace("+", "")), Infinity]
-        : req.query.CourseDuration.split("-").map(Number);
-
-      if (max === undefined) max = Infinity;
-
-      durationConditions = [
-        {
-          CourseDurationUnits: "Years",
-          CourseDuration: { $gte: min / 12, $lte: max / 12 },
-        },
-        {
-          CourseDurationUnits: "Months",
-          CourseDuration: { $gte: min, $lte: max },
-        },
-        {
-          CourseDurationUnits: "Weeks",
-          CourseDuration: { $gte: min / 0.23, $lte: max / 0.23 },
-        },
-      ];
-    }
-
-    // Handle mode of study
-    let modeOfStudyConditions = [];
-    if (req.query.ModeOfStudy) {
-      modeOfStudyConditions = [
-        { "ModeOfStudy.en": req.query.ModeOfStudy },
-        { "ModeOfStudy.ar": req.query.ModeOfStudy },
-      ];
-    }
-
-    // Handle search query
-    let searchConditions = [];
-    if (req.query.searchQuery) {
-      try {
-        const searchQuery = JSON.parse(req.query.searchQuery);
-
-        if (searchQuery.en) {
-          searchConditions.push({
-            "Tags.en": { $regex: searchQuery.en, $options: "i" },
-          });
-        }
-
-        if (searchQuery.ar) {
-          searchConditions.push({
-            "Tags.ar": { $regex: searchQuery.ar, $options: "i" },
-          });
-        }
-      } catch (error) {
-        console.error("Error parsing searchQuery:", error.message);
-      }
-    }
+    const courseMatchConditions = {};
 
     // Get university IDs first
     const matchingUniversities = await universityModel
@@ -582,17 +251,86 @@ const getUniversitiesByCountries = async (req, res) => {
     const universityIds = matchingUniversities.map((uni) => uni._id);
     courseMatchConditions.university = { $in: universityIds };
 
-    // Build the final course query
-    let courseQuery = { $and: [courseMatchConditions] };
+    // Add budget filter if provided
+    if (req.query.minBudget || req.query.maxBudget) {
+      courseMatchConditions.CourseFees = {};
+      if (req.query.minBudget && req.query.minBudget !== "") {
+        courseMatchConditions.CourseFees.$gte = Number(req.query.minBudget);
+      }
+      if (req.query.maxBudget && req.query.maxBudget !== "") {
+        courseMatchConditions.CourseFees.$lte = Number(req.query.maxBudget);
+      }
+    }
 
-    // Add $or conditions if they exist
-    const orConditions = [
-      ...durationConditions,
-      ...modeOfStudyConditions,
-      ...searchConditions,
-    ];
-    if (orConditions.length > 0) {
-      courseQuery.$and.push({ $or: orConditions });
+    // Build the final course query
+    let courseQuery = courseMatchConditions;
+    const andConditions = [];
+
+    // Handle course duration
+    if (req.query.CourseDuration && req.query.CourseDuration !== "") {
+      let [min, max] = req.query.CourseDuration.includes("+")
+        ? [Number(req.query.CourseDuration.replace("+", "")), Infinity]
+        : req.query.CourseDuration.split("-").map(Number);
+
+      if (max === undefined) max = Infinity;
+
+      const durationConditions = [
+        {
+          CourseDurationUnits: "Years",
+          CourseDuration: { $gte: min / 12, $lte: max / 12 },
+        },
+        {
+          CourseDurationUnits: "Months",
+          CourseDuration: { $gte: min, $lte: max },
+        },
+        {
+          CourseDurationUnits: "Weeks",
+          CourseDuration: { $gte: min / 0.23, $lte: max / 0.23 },
+        },
+      ];
+
+      andConditions.push({ $or: durationConditions });
+    }
+
+    // Handle mode of study
+    if (req.query.ModeOfStudy && req.query.ModeOfStudy !== "") {
+      const modeOfStudyConditions = [
+        { "ModeOfStudy.en": req.query.ModeOfStudy },
+        { "ModeOfStudy.ar": req.query.ModeOfStudy },
+      ];
+
+      andConditions.push({ $or: modeOfStudyConditions });
+    }
+
+    // Handle search query
+    if (req.query.searchQuery && req.query.searchQuery !== "") {
+      try {
+        const searchQuery = JSON.parse(req.query.searchQuery);
+        const searchConditions = [];
+
+        if (searchQuery.en && searchQuery.en !== "") {
+          searchConditions.push({
+            "Tags.en": { $regex: searchQuery.en, $options: "i" },
+          });
+        }
+
+        if (searchQuery.ar && searchQuery.ar !== "") {
+          searchConditions.push({
+            "Tags.ar": { $regex: searchQuery.ar, $options: "i" },
+          });
+        }
+
+        if (searchConditions.length > 0) {
+          andConditions.push({ $or: searchConditions });
+        }
+      } catch (error) {
+        console.error("Error parsing searchQuery:", error.message);
+      }
+    }
+
+    // Only add $and if we have additional conditions
+    if (andConditions.length > 0) {
+      courseQuery = { $and: [courseMatchConditions, ...andConditions] };
     }
 
     // Get distinct university IDs from courses
@@ -652,9 +390,6 @@ const getUniversitiesByCountries = async (req, res) => {
 
     // Store in cache
     queryCache.set(cacheKey, result);
-
-    const endTime = Date.now();
-    console.log(`Query execution time: ${endTime - startTime}ms`);
 
     res.status(200).json(result);
   } catch (error) {
@@ -830,9 +565,6 @@ const getCoursesByUniversities = async (req, res) => {
     // Store in cache
     queryCache.set(cacheKey, result);
 
-    const endTime = Date.now();
-    console.log(`Query execution time: ${endTime - startTime}ms`);
-
     res.status(200).json(result);
   } catch (error) {
     console.error("Error in getCoursesByUniversities:", error);
@@ -907,9 +639,6 @@ const getBlogsByCountries = async (req, res) => {
 
     // Store in cache
     queryCache.set(cacheKey, result);
-
-    const endTime = Date.now();
-    console.log(`getBlogsByCountries execution time: ${endTime - startTime}ms`);
 
     res.status(200).json(result);
   } catch (error) {
