@@ -1,8 +1,8 @@
 const countryModel = require("../models/CountryModel");
 const universityModel = require("../models/UniversityModel");
-const majorModel = require("../models/MajorsModel"); // Changed from courseModel
+const courseModel = require("../models/CourseModel");
 const BlogModel = require("../models/BlogModel");
-const NodeCache = require("node-cache");
+const NodeCache = require("node-cache"); // You'll need to install this: npm install node-cache
 
 const queryCache = new NodeCache({ stdTTL: 600, checkperiod: 120 });
 
@@ -52,6 +52,8 @@ const generateCacheKey = (prefix, params) => {
 // Modified getCountries function
 const getCountries = async (req, res) => {
   try {
+    const startTime = Date.now();
+
     // Parse filterProp first to ensure cache key is based on parsed content
     let parsedFilterProp = {};
     if (req.query.filterProp) {
@@ -113,6 +115,8 @@ const getCountries = async (req, res) => {
 // 2. Cached getUniversitiesByCountries function
 const getUniversitiesByCountries = async (req, res) => {
   try {
+    const startTime = Date.now();
+
     // Generate cache key from all query parameters
     const cacheKey = generateCacheKey("universities", req.query);
 
@@ -157,21 +161,21 @@ const getUniversitiesByCountries = async (req, res) => {
       universityFilter.inTakeMonth = req.query.IntakeMonth;
     }
 
-    // Check if we need major filtering - only consider non-empty values
-    const needsMajorFiltering =
+    // Check if we need course filtering - only consider non-empty values
+    const needsCourseFiltering =
       (req.query.minBudget && req.query.minBudget !== "") ||
       (req.query.maxBudget && req.query.maxBudget !== "") ||
       (req.query.ModeOfStudy && req.query.ModeOfStudy !== "") ||
-      (req.query.MajorDuration && req.query.MajorDuration !== "") || // Changed from CourseDuration
+      (req.query.CourseDuration && req.query.CourseDuration !== "") ||
       (req.query.searchQuery && req.query.searchQuery !== "");
 
     // Pagination
-    const page = Number.parseInt(req.query.page) || 1;
-    const limit = Number.parseInt(req.query.limit) || 10;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    // Simple case - no major filtering needed
-    if (!needsMajorFiltering) {
+    // Simple case - no course filtering needed
+    if (!needsCourseFiltering) {
       const totalUniversities = await universityModel.countDocuments(
         universityFilter
       );
@@ -217,9 +221,9 @@ const getUniversitiesByCountries = async (req, res) => {
       return res.status(200).json(result);
     }
 
-    // Complex case - need to filter by major properties
-    // Build major match conditions
-    const majorMatchConditions = {};
+    // Complex case - need to filter by course properties
+    // Build course match conditions
+    const courseMatchConditions = {};
 
     // Get university IDs first
     const matchingUniversities = await universityModel
@@ -245,51 +249,43 @@ const getUniversitiesByCountries = async (req, res) => {
 
     // Extract university IDs
     const universityIds = matchingUniversities.map((uni) => uni._id);
-    majorMatchConditions.university = { $in: universityIds };
+    courseMatchConditions.university = { $in: universityIds };
 
     // Add budget filter if provided
     if (req.query.minBudget || req.query.maxBudget) {
-      majorMatchConditions.majorTuitionFees = {}; // Changed from CourseFees
+      courseMatchConditions.CourseFees = {};
       if (req.query.minBudget && req.query.minBudget !== "") {
-        majorMatchConditions.majorTuitionFees.$gte = Number(
-          req.query.minBudget
-        );
+        courseMatchConditions.CourseFees.$gte = Number(req.query.minBudget);
       }
       if (req.query.maxBudget && req.query.maxBudget !== "") {
-        majorMatchConditions.majorTuitionFees.$lte = Number(
-          req.query.maxBudget
-        );
+        courseMatchConditions.CourseFees.$lte = Number(req.query.maxBudget);
       }
     }
 
-    // Build the final major query
-    let majorQuery = majorMatchConditions;
+    // Build the final course query
+    let courseQuery = courseMatchConditions;
     const andConditions = [];
 
-    // Handle major duration
-    if (req.query.MajorDuration && req.query.MajorDuration !== "") {
-      // Changed from CourseDuration
-      let [min, max] = req.query.MajorDuration.includes("+")
-        ? [
-            Number(req.query.MajorDuration.replace("+", "")),
-            Number.POSITIVE_INFINITY,
-          ]
-        : req.query.MajorDuration.split("-").map(Number);
+    // Handle course duration
+    if (req.query.CourseDuration && req.query.CourseDuration !== "") {
+      let [min, max] = req.query.CourseDuration.includes("+")
+        ? [Number(req.query.CourseDuration.replace("+", "")), Infinity]
+        : req.query.CourseDuration.split("-").map(Number);
 
-      if (max === undefined) max = Number.POSITIVE_INFINITY;
+      if (max === undefined) max = Infinity;
 
       const durationConditions = [
         {
-          durationUnits: "Years", // Changed from CourseDurationUnits
-          duration: { $gte: min / 12, $lte: max / 12 }, // Changed from CourseDuration
+          CourseDurationUnits: "Years",
+          CourseDuration: { $gte: min / 12, $lte: max / 12 },
         },
         {
-          durationUnits: "Months", // Changed from CourseDurationUnits
-          duration: { $gte: min, $lte: max }, // Changed from CourseDuration
+          CourseDurationUnits: "Months",
+          CourseDuration: { $gte: min, $lte: max },
         },
         {
-          durationUnits: "Weeks", // Changed from CourseDurationUnits
-          duration: { $gte: min / 0.23, $lte: max / 0.23 }, // Changed from CourseDuration
+          CourseDurationUnits: "Weeks",
+          CourseDuration: { $gte: min / 0.23, $lte: max / 0.23 },
         },
       ];
 
@@ -299,7 +295,8 @@ const getUniversitiesByCountries = async (req, res) => {
     // Handle mode of study
     if (req.query.ModeOfStudy && req.query.ModeOfStudy !== "") {
       const modeOfStudyConditions = [
-        { modeOfStudy: { $in: [req.query.ModeOfStudy] } }, // Changed to match majorSchema
+        { "ModeOfStudy.en": req.query.ModeOfStudy },
+        { "ModeOfStudy.ar": req.query.ModeOfStudy },
       ];
 
       andConditions.push({ $or: modeOfStudyConditions });
@@ -333,16 +330,16 @@ const getUniversitiesByCountries = async (req, res) => {
 
     // Only add $and if we have additional conditions
     if (andConditions.length > 0) {
-      majorQuery = { $and: [majorMatchConditions, ...andConditions] };
+      courseQuery = { $and: [courseMatchConditions, ...andConditions] };
     }
 
-    // Get distinct university IDs from majors
-    const matchingMajorUniversities = await majorModel.distinct(
+    // Get distinct university IDs from courses
+    const matchingCourseUniversities = await courseModel.distinct(
       "university",
-      majorQuery
+      courseQuery
     );
 
-    if (matchingMajorUniversities.length === 0) {
+    if (matchingCourseUniversities.length === 0) {
       const emptyResult = {
         data: [],
         pagination: {
@@ -361,7 +358,7 @@ const getUniversitiesByCountries = async (req, res) => {
     // Final university query with the filtered IDs
     const finalUniversityFilter = {
       ...universityFilter,
-      _id: { $in: matchingMajorUniversities },
+      _id: { $in: matchingCourseUniversities },
     };
 
     // Get total count
@@ -401,12 +398,13 @@ const getUniversitiesByCountries = async (req, res) => {
   }
 };
 
-// 3. Cached getMajorsByUniversities function (renamed from getCoursesByUniversities)
-
-const getMajorsByUniversities = async (req, res) => {
+// 3. Cached getCoursesByUniversities function
+const getCoursesByUniversities = async (req, res) => {
   try {
+    const startTime = Date.now();
+
     // Generate cache key
-    const cacheKey = generateCacheKey("majors", req.query);
+    const cacheKey = generateCacheKey("courses", req.query);
 
     // Check cache
     const cachedResult = queryCache.get(cacheKey);
@@ -421,78 +419,60 @@ const getMajorsByUniversities = async (req, res) => {
     if (!universityIds.length)
       return res.status(400).json({ message: "No university IDs provided" });
 
-    // Build the major filter
-    const majorFilter = { university: { $in: universityIds } };
+    // Build the course filter
+    const courseFilter = { university: { $in: universityIds } };
 
-    // Add budget filter - Note: majorTuitionFees is a string in your schema
+    // Add budget filter
     if (req.query.minBudget || req.query.maxBudget) {
-      // For string comparison of numbers, we need to use $expr with $and
-      const budgetConditions = [];
-
-      if (req.query.minBudget) {
-        const minBudget = Number(req.query.minBudget);
-        budgetConditions.push({
-          $gte: [{ $toDouble: "$majorTuitionFees" }, minBudget],
-        });
-      }
-
-      if (req.query.maxBudget) {
-        const maxBudget = Number(req.query.maxBudget);
-        budgetConditions.push({
-          $lte: [{ $toDouble: "$majorTuitionFees" }, maxBudget],
-        });
-      }
-
-      if (budgetConditions.length > 0) {
-        majorFilter.$expr = { $and: budgetConditions };
-      }
+      courseFilter.CourseFees = {};
+      if (req.query.minBudget)
+        courseFilter.CourseFees.$gte = Number(req.query.minBudget);
+      if (req.query.maxBudget)
+        courseFilter.CourseFees.$lte = Number(req.query.maxBudget);
     }
 
-    // Add duration conditions - using duration and durationUnits fields
-    if (req.query.MajorDuration) {
-      let [min, max] = req.query.MajorDuration.includes("+")
-        ? [
-            Number(req.query.MajorDuration.replace("+", "")),
-            Number.POSITIVE_INFINITY,
-          ]
-        : req.query.MajorDuration.split("-").map(Number);
+    // Add duration conditions
+    if (req.query.CourseDuration) {
+      let [min, max] = req.query.CourseDuration.includes("+")
+        ? [Number(req.query.CourseDuration.replace("+", "")), Infinity]
+        : req.query.CourseDuration.split("-").map(Number);
 
-      if (max === undefined) max = Number.POSITIVE_INFINITY;
+      if (max === undefined) max = Infinity;
 
-      // Using the duration field from your schema
-      const durationConditions = [];
-
-      // Check if we should use duration or majorIntakeYear
-      durationConditions.push(
+      courseFilter.$or = [
         {
-          durationUnits: "Years",
-          duration: { $gte: min / 12, $lte: max / 12 },
+          CourseDurationUnits: "Years",
+          CourseDuration: { $gte: min / 12, $lte: max / 12 },
         },
         {
-          durationUnits: "Months",
-          duration: { $gte: min, $lte: max },
+          CourseDurationUnits: "Months",
+          CourseDuration: { $gte: min, $lte: max },
         },
         {
-          durationUnits: "Weeks",
-          duration: { $gte: min / 0.23, $lte: max / 0.23 },
-        }
-      );
-
-      if (durationConditions.length > 0) {
-        majorFilter.$or = durationConditions;
-      }
+          CourseDurationUnits: "Weeks",
+          CourseDuration: { $gte: min / 0.23, $lte: max / 0.23 },
+        },
+      ];
     }
 
-    // Add mode of study filter - modeOfStudy is an array in your schema
+    // Add mode of study filter
     if (req.query.ModeOfStudy) {
-      if (majorFilter.$or) {
-        majorFilter.$and = [
-          { $or: majorFilter.$or },
-          { modeOfStudy: { $in: [req.query.ModeOfStudy] } },
+      if (courseFilter.$or) {
+        courseFilter.$and = [
+          { $or: courseFilter.$or },
+          {
+            $or: [
+              { "ModeOfStudy.en": req.query.ModeOfStudy },
+              { "ModeOfStudy.ar": req.query.ModeOfStudy },
+            ],
+          },
         ];
-        delete majorFilter.$or;
+        delete courseFilter.$or;
       } else {
-        majorFilter.modeOfStudy = { $in: [req.query.ModeOfStudy] };
+        courseFilter.$or = [
+          { "ModeOfStudy.en": req.query.ModeOfStudy },
+          { "ModeOfStudy.ar": req.query.ModeOfStudy },
+        ];
       }
     }
 
@@ -516,16 +496,16 @@ const getMajorsByUniversities = async (req, res) => {
             });
           }
 
-          if (majorFilter.$and) {
-            majorFilter.$and.push({ $or: searchConditions });
-          } else if (majorFilter.$or) {
-            majorFilter.$and = [
-              { $or: majorFilter.$or },
+          if (courseFilter.$and) {
+            courseFilter.$and.push({ $or: searchConditions });
+          } else if (courseFilter.$or) {
+            courseFilter.$and = [
+              { $or: courseFilter.$or },
               { $or: searchConditions },
             ];
-            delete majorFilter.$or;
+            delete courseFilter.$or;
           } else {
-            majorFilter.$or = searchConditions;
+            courseFilter.$or = searchConditions;
           }
         }
       } catch (error) {
@@ -534,20 +514,20 @@ const getMajorsByUniversities = async (req, res) => {
     }
 
     // Pagination
-    const page = Number.parseInt(req.query.page) || 1;
-    const limit = Number.parseInt(req.query.limit) || 5;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 5;
     const skip = (page - 1) * limit;
 
     // Get count first
-    const totalMajors = await majorModel.countDocuments(majorFilter);
+    const totalCourses = await courseModel.countDocuments(courseFilter);
 
-    if (totalMajors === 0) {
+    if (totalCourses === 0) {
       const emptyResult = {
         data: [],
         pagination: {
           page,
           limit,
-          totalMajors: 0,
+          totalCourses: 0,
           hasMore: false,
           totalPages: 0,
         },
@@ -557,28 +537,28 @@ const getMajorsByUniversities = async (req, res) => {
       return res.status(200).json(emptyResult);
     }
 
-    // Get majors with pagination - adjust field selection based on your schema
-    const majors = await majorModel
-      .find(majorFilter)
+    // Get courses with pagination
+    const courses = await courseModel
+      .find(courseFilter)
       .select(
-        "majorName majorTuitionFees duration durationUnits majorIntakeMonth modeOfStudy Tags customURLSlug university majorLanguages majorCheckBox"
+        "CourseName CourseFees CourseDuration DeadLine ModeOfStudy Tags customURLSlug university Languages"
       )
       .populate(
         "university",
-        "uniName uniType studyLevel uniTutionFees uniSymbol uniFeatured"
+        "uniName uniType studyLevel uniTutionFees uniFeatured"
       )
       .skip(skip)
       .limit(limit)
       .lean();
 
     const result = {
-      data: majors,
+      data: courses,
       pagination: {
         page,
         limit,
-        totalMajors,
-        hasMore: page * limit < totalMajors,
-        totalPages: Math.ceil(totalMajors / limit),
+        totalCourses,
+        hasMore: page * limit < totalCourses,
+        totalPages: Math.ceil(totalCourses / limit),
       },
     };
 
@@ -587,7 +567,7 @@ const getMajorsByUniversities = async (req, res) => {
 
     res.status(200).json(result);
   } catch (error) {
-    console.error("Error in getMajorsByUniversities:", error);
+    console.error("Error in getCoursesByUniversities:", error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -595,6 +575,8 @@ const getMajorsByUniversities = async (req, res) => {
 // 4. Cached getBlogsByCountries function
 const getBlogsByCountries = async (req, res) => {
   try {
+    const startTime = Date.now();
+
     // Generate cache key
     const cacheKey = generateCacheKey("blogs", req.query);
 
@@ -611,8 +593,8 @@ const getBlogsByCountries = async (req, res) => {
     if (!countryIds.length)
       return res.status(400).json({ message: "No country IDs provided" });
 
-    const page = Number.parseInt(req.query.page) || 1;
-    const limit = Number.parseInt(req.query.limit) || 10;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
     // Get count first
@@ -665,9 +647,54 @@ const getBlogsByCountries = async (req, res) => {
   }
 };
 
+// Cache management functions
+const clearCache = (req, res) => {
+  try {
+    queryCache.flushAll();
+    res.status(200).json({ message: "Cache cleared successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const clearCacheByPattern = (req, res) => {
+  try {
+    const pattern = req.params.pattern;
+    if (!pattern) {
+      return res.status(400).json({ message: "Pattern is required" });
+    }
+
+    const keys = queryCache.keys();
+    let count = 0;
+
+    keys.forEach((key) => {
+      if (key.startsWith(pattern)) {
+        queryCache.del(key);
+        count++;
+      }
+    });
+
+    res.status(200).json({
+      message: `Cleared ${count} cache entries matching pattern: ${pattern}`,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Function to invalidate cache when data changes
+const invalidateCache = (prefix) => {
+  const keys = queryCache.keys();
+  keys.forEach((key) => {
+    if (key.startsWith(prefix)) {
+      queryCache.del(key);
+    }
+  });
+};
+
 module.exports = {
   getCountries,
   getBlogsByCountries,
   getUniversitiesByCountries,
-  getMajorsByUniversities, // Changed from getCoursesByUniversities
+  getCoursesByUniversities,
 };

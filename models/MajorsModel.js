@@ -47,7 +47,7 @@ const majorSchema = new Schema({
     en: { type: String },
     ar: { type: String },
   },
-
+  Tags: { en: [{ type: String }], ar: [{ type: String }] },
   seo: {
     metaTitle: {
       en: { type: String, index: true },

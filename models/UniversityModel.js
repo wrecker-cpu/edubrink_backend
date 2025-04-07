@@ -92,9 +92,7 @@ const universitySchema = new Schema({
       ar: [{ type: String }], // Array of SEO Keywords in Arabic
     },
   },
-  uniTutionFees: {
-    type: Number,
-  },
+
   uniCreationDate: {
     type: Date,
     default: Date.now,

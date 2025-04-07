@@ -111,7 +111,7 @@ const getAllMajors = async (req, res) => {
 
     // Build the query for filtering
     const query = {};
-    
+
     // Handle search term
     if (search) {
       // Step 1: Fetch matching universities based on the search term
@@ -138,11 +138,11 @@ const getAllMajors = async (req, res) => {
       // Handle min/max ranges if provided
       if (majorTuitionFeesMin || majorTuitionFeesMax) {
         query.majorTuitionFees = {};
-        
+
         if (majorTuitionFeesMin) {
           query.majorTuitionFees.$gte = parseFloat(majorTuitionFeesMin);
         }
-        
+
         if (majorTuitionFeesMax) {
           query.majorTuitionFees.$lte = parseFloat(majorTuitionFeesMax);
         }
@@ -205,6 +205,110 @@ const getAllMajors = async (req, res) => {
         totalPages, // Total number of pages
         currentPage: parsedPage, // Current page
         limit: parsedLimit, // Number of majors per page
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+const getAllMajorsLikeInsta = async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+    const lastId = req.query.lastId;
+
+    // Parse filterProp from query
+    let filterProp = {};
+    if (req.query.filterProp) {
+      try {
+        filterProp = JSON.parse(req.query.filterProp); // Parse directly
+      } catch (error) {
+        console.error("Error parsing filterProp:", error.message);
+      }
+    }
+
+    let filter = {};
+    if (lastId) {
+      filter._id = { $gt: lastId };
+    }
+
+    // Apply filter logic from filterProp
+    if (filterProp.minBudget || filterProp.maxBudget) {
+      filter.majorTuitionFees = {
+        $gte: Number(filterProp.minBudget) || 0,
+        $lte: Number(filterProp.maxBudget) || Infinity,
+      };
+    }
+
+    if (filterProp["ModeOfStudy"]) {
+      // Assuming modeOfStudy is an array in the major model
+      filter.modeOfStudy = { $in: [filterProp["ModeOfStudy"]] };
+    }
+
+    if (
+      (filterProp["searchQuery.en"] &&
+        filterProp["searchQuery.en"].trim() !== "") ||
+      (filterProp["searchQuery.ar"] &&
+        filterProp["searchQuery.ar"].trim() !== "")
+    ) {
+      filter.$or = [];
+
+      if (
+        filterProp["searchQuery.en"] &&
+        filterProp["searchQuery.en"].trim() !== ""
+      ) {
+        filter.$or.push({
+          "Tags.en": { $in: [filterProp["searchQuery.en"]] },
+        });
+      }
+
+      if (
+        filterProp["searchQuery.ar"] &&
+        filterProp["searchQuery.ar"].trim() !== ""
+      ) {
+        filter.$or.push({
+          "Tags.ar": { $in: [filterProp["searchQuery.ar"]] },
+        });
+      }
+    }
+
+    if (filterProp.MajorDuration) {
+      let [min, max] = filterProp.MajorDuration.split("-").map(Number);
+      if (max === undefined) {
+        max = Infinity;
+      }
+
+      // Convert all durations to months before filtering
+      filter.$or = [
+        {
+          durationUnits: "Years",
+          duration: { $gte: min / 12, $lte: max / 12 },
+        },
+        {
+          durationUnits: "Months",
+          duration: { $gte: min, $lte: max },
+        },
+        {
+          durationUnits: "Weeks",
+          duration: { $gte: min / 0.23, $lte: max / 0.23 },
+        },
+      ];
+    }
+
+    const majors = await MajorsModel.find(filter)
+      .sort({ _id: 1 })
+      .limit(limit)
+      .populate("university")
+      .lean();
+
+    // Store the last fetched ID
+    const newLastId = majors.length ? majors[majors.length - 1]._id : null;
+
+    res.status(200).json({
+      data: majors,
+      meta: {
+        lastId: newLastId,
+        hasNextPage: !!newLastId,
       },
     });
   } catch (err) {
@@ -304,6 +408,7 @@ module.exports = {
   getMajorsById,
   getAllMajors,
   getMajorsByName,
+  getAllMajorsLikeInsta,
   updateMajors,
   deleteMajors,
 };

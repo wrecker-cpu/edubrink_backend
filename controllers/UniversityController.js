@@ -55,10 +55,10 @@ const getUniversityById = async (req, res) => {
 
 const getUniversityByName = async (req, res) => {
   const name = req.params.name;
-  const coursePage = parseInt(req.query.coursePage) || 1;
-  const courseLimit = parseInt(req.query.courseLimit) || 2;
-  const majorPage = parseInt(req.query.majorPage) || 1;
-  const majorLimit = parseInt(req.query.majorLimit) || 2;
+  const coursePage = Number.parseInt(req.query.coursePage) || 1;
+  const courseLimit = Number.parseInt(req.query.courseLimit) || 2;
+  const majorPage = Number.parseInt(req.query.majorPage) || 1;
+  const majorLimit = Number.parseInt(req.query.majorLimit) || 2;
   const studyLevel = req.query.studyLevel
     ? Array.isArray(req.query.studyLevel)
       ? req.query.studyLevel
@@ -81,6 +81,13 @@ const getUniversityByName = async (req, res) => {
             { "customURLSlug.en": { $regex: name, $options: "i" } },
             { "customURLSlug.ar": { $regex: name, $options: "i" } },
           ],
+        },
+      },
+      // Ensure courseId and major are arrays
+      {
+        $addFields: {
+          courseId: { $ifNull: ["$courseId", []] },
+          major: { $ifNull: ["$major", []] },
         },
       },
       {
@@ -185,8 +192,20 @@ const getUniversityByName = async (req, res) => {
         $addFields: {
           totalCourses: { $size: "$courseId" },
           totalMajors: { $size: "$major" },
-          highestCourseTuitionFees: { $max: "$courses.CourseFees" }, // Highest course tuition fees
-          lowestCourseTuitionFees: { $min: "$courses.CourseFees" }, // Lowest course tuition fees
+          highestCourseTuitionFees: {
+            $cond: {
+              if: { $gt: [{ $size: "$courses" }, 0] },
+              then: { $max: "$courses.CourseFees" },
+              else: null,
+            },
+          },
+          lowestCourseTuitionFees: {
+            $cond: {
+              if: { $gt: [{ $size: "$courses" }, 0] },
+              then: { $min: "$courses.CourseFees" },
+              else: null,
+            },
+          },
         },
       },
       {
@@ -260,6 +279,7 @@ const getUniversityByName = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
 const getAllUniversities = async (req, res) => {
   try {
     // Aggregation pipeline to join universities with their countries and populate courses
@@ -540,68 +560,94 @@ const getUniversitiesLimitedQuery = async (req, res) => {
 
 // Update a University by ID
 const updateUniversity = async (req, res) => {
-  const id = req.params.id
+  const id = req.params.id;
   try {
-    const { uniCountry, courseId, major, ...universityDetails } = req.body
+    const { uniCountry, courseId, major, ...universityDetails } = req.body;
 
     // First, get the current university to check its current country
-    const currentUniversity = await universityModel.findById(id).lean()
+    const currentUniversity = await universityModel.findById(id).lean();
 
     if (!currentUniversity) {
-      return res.status(404).json({ message: "University not found" })
+      return res.status(404).json({ message: "University not found" });
     }
 
     // Step 1: Find and update the university
     const updatedUniversity = await universityModel
-      .findByIdAndUpdate(id, { ...universityDetails, courseId, uniCountry, major }, { new: true })
-      .lean()
+      .findByIdAndUpdate(
+        id,
+        { ...universityDetails, courseId, uniCountry, major },
+        { new: true }
+      )
+      .lean();
 
-    await createNotification("University", updatedUniversity, "uniName", "updated")
+    await createNotification(
+      "University",
+      updatedUniversity,
+      "uniName",
+      "updated"
+    );
 
     // Step 2: Handle country relationships
     if (uniCountry) {
       // If the university was previously associated with a different country,
       // remove it from that country
-      if (currentUniversity.uniCountry && currentUniversity.uniCountry.toString() !== uniCountry.toString()) {
-        await countryModel.findByIdAndUpdate(currentUniversity.uniCountry, { $pull: { universities: id } })
+      if (
+        currentUniversity.uniCountry &&
+        currentUniversity.uniCountry.toString() !== uniCountry.toString()
+      ) {
+        await countryModel.findByIdAndUpdate(currentUniversity.uniCountry, {
+          $pull: { universities: id },
+        });
       }
 
       // Add the university to the new country
       await countryModel.findByIdAndUpdate(
         uniCountry,
         { $addToSet: { universities: updatedUniversity._id } },
-        { new: true },
-      )
+        { new: true }
+      );
     }
 
     if (courseId) {
-      await courseModel.updateMany({ university: id, _id: { $nin: courseId } }, { $unset: { university: "" } })
+      await courseModel.updateMany(
+        { university: id, _id: { $nin: courseId } },
+        { $unset: { university: "" } }
+      );
     }
 
     if (major) {
       // First, remove university reference from all majors that reference this university
-      await MajorsModel.updateMany({ university: id }, { $unset: { university: "" } })
+      await MajorsModel.updateMany(
+        { university: id },
+        { $unset: { university: "" } }
+      );
 
       // Then, set university reference for the majors in the provided array
       if (major.length > 0) {
-        await MajorsModel.updateMany({ _id: { $in: major } }, { $set: { university: id } })
+        await MajorsModel.updateMany(
+          { _id: { $in: major } },
+          { $set: { university: id } }
+        );
       }
     } else {
       // If no major array is provided, remove university reference from all majors
       // that reference this university
-      await MajorsModel.updateMany({ university: id }, { $unset: { university: "" } })
+      await MajorsModel.updateMany(
+        { university: id },
+        { $unset: { university: "" } }
+      );
     }
 
-    const clearCache = true
+    const clearCache = true;
     res.status(200).json({
       data: updatedUniversity,
       message: "University updated successfully and linked to country!",
       clearCache,
-    })
+    });
   } catch (err) {
-    res.status(500).json({ message: err.message })
+    res.status(500).json({ message: err.message });
   }
-}
+};
 
 // Delete a University by ID
 
