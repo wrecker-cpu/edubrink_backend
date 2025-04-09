@@ -561,12 +561,9 @@ const getMajorsByUniversities = async (req, res) => {
     const majors = await majorModel
       .find(majorFilter)
       .select(
-        "majorName majorTuitionFees duration durationUnits majorIntakeMonth modeOfStudy Tags customURLSlug university majorLanguages majorCheckBox"
+        "majorName majorTuitionFees studyLevel duration durationUnits majorIntakeMonth modeOfStudy Tags customURLSlug university majorLanguages majorCheckBox"
       )
-      .populate(
-        "university",
-        "uniName uniType studyLevel uniTutionFees uniSymbol uniFeatured"
-      )
+      .populate("university", "uniName uniType uniSymbol uniFeatured")
       .skip(skip)
       .limit(limit)
       .lean();

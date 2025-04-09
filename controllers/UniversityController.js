@@ -466,7 +466,10 @@ const getAllUniversityLikeInsta = async (req, res) => {
       .find(filter)
       .sort({ _id: 1 })
       .limit(limit)
-      .populate("uniCountry")
+      .select(
+        "_id uniCountry uniName uniSymbol customURLSlug uniType studyLevel scholarshipAvailability uniDiscount uniTutionFees uniFeatured"
+      )
+      .populate("uniCountry", "countryName countryPhotos countryCode")
       .lean();
 
     // **Store the last fetched ID**

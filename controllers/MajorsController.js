@@ -298,7 +298,10 @@ const getAllMajorsLikeInsta = async (req, res) => {
     const majors = await MajorsModel.find(filter)
       .sort({ _id: 1 })
       .limit(limit)
-      .populate("university")
+      .select(
+        "majorName majorTuitionFees studyLevel duration durationUnits majorIntakeMonth modeOfStudy Tags customURLSlug university majorLanguages majorCheckBox"
+      )
+      .populate("university", "uniName uniType uniSymbol uniFeatured")
       .lean();
 
     // Store the last fetched ID
