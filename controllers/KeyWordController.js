@@ -81,7 +81,6 @@ const getKeywords = async (req, res) => {
       { type: "university", data: universityKeywords },
       { type: "course", data: courseKeywords },
       { type: "tag", data: tagKeywords },
-      // { type: "faculty", data: facultyKeywords },
       { type: "major", data: majorKeywords },
     ];
 
