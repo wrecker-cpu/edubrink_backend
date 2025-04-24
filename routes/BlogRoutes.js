@@ -9,7 +9,7 @@ router.post(
   auth.restrictToEditorAndAdmin,
   blogController.createBlog
 );
-router.get("/name/:name", auth.protect, blogController.getBlogByName);
+router.get("/name/:name", blogController.getBlogByName);
 router.put(
   "/:id",
   auth.protect,
@@ -17,7 +17,7 @@ router.put(
   blogController.updateBlog
 );
 router.get("/getAll/User/Insta", blogController.getAllBlogLikeInsta);
-router.get("/:id", auth.protect, blogController.getBlogById);
+router.get("/:id", blogController.getBlogById);
 router.get("/", blogController.getAllBlog);
 router.delete(
   "/:id",
