@@ -145,7 +145,7 @@ const getCountryByName = async (req, res) => {
       .populate({
         path: "universities",
         select:
-          "courseId uniName customURLSlug scholarshipAvailability uniTutionFees",
+          "courseId uniName uniSymbol customURLSlug scholarshipAvailability uniTutionFees",
         options: { limit: 5 }, // Limit universities to 5
         populate: {
           path: "courseId",

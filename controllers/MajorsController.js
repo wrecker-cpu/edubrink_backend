@@ -74,7 +74,14 @@ const getMajorsByName = async (req, res) => {
     })
       .populate({
         path: "university",
-        select: "uniName customURLSlug uniSymbol",
+        select: "uniName uniSymbol customURLSlug",
+        populate: {
+          path: "major", // Assuming "courses" is the field inside the university schema
+          model: "Major", // Replace "Course" with your actual course model name
+          select:
+            "majorName customURLSlug majorTuitionFees majorLanguages duration durationUnits studyLevel", // Select only necessary fields
+          options: { limit: 5 }, // Limit courses to 5
+        },
       })
       .lean();
 
