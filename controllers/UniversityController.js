@@ -243,21 +243,34 @@ const getUniversityByName = async (req, res) => {
           totalCourses: { $size: "$courseId" },
           totalMajors: { $size: "$major" },
           highestCourseTuitionFees: {
-            $cond: {
-              if: { $gt: [{ $size: "$courses" }, 0] },
-              then: { $max: "$courses.CourseFees" },
-              else: null,
-            },
+            $cond: [
+              { $gt: [{ $size: "$courses" }, 0] },
+              { $max: "$courses.CourseFees" },
+              {
+                $cond: [
+                  { $gt: [{ $size: "$majors" }, 0] },
+                  { $max: "$majors.majorTuitionFees" },
+                  null,
+                ],
+              },
+            ],
           },
           lowestCourseTuitionFees: {
-            $cond: {
-              if: { $gt: [{ $size: "$courses" }, 0] },
-              then: { $min: "$courses.CourseFees" },
-              else: null,
-            },
+            $cond: [
+              { $gt: [{ $size: "$courses" }, 0] },
+              { $min: "$courses.CourseFees" },
+              {
+                $cond: [
+                  { $gt: [{ $size: "$majors" }, 0] },
+                  { $min: "$majors.majorTuitionFees" },
+                  null,
+                ],
+              },
+            ],
           },
         },
       },
+
       {
         $project: {
           uniName: 1,
@@ -512,8 +525,8 @@ const getUniversitiesLimitedQuery = async (req, res) => {
         uniSymbol: 1,
         courseId: 1,
         scholarshipAvailability: 1,
-        spokenLanguage: 1, // We'll populate this field
-        study_programs: 1, // We'll populate this field
+        spokenLanguage: 1,
+        study_programs: 1,
         uniType: 1,
         inTakeMonth: 1,
         inTakeYear: 1,
@@ -537,28 +550,102 @@ const getUniversitiesLimitedQuery = async (req, res) => {
       };
     }
 
-    // First, get all universities with their course IDs
-    const universities = await universityModel
-      .find({
-        $or: [
-          { "uniName.en": { $regex: search, $options: "i" } },
-          { "uniName.ar": { $regex: search, $options: "i" } },
-        ],
-      })
-      .lean();
+    // First, get total count for pagination (without search filter)
+    const countPipeline = [
+      {
+        $lookup: {
+          from: "countries",
+          localField: "uniCountry",
+          foreignField: "_id",
+          as: "country",
+        },
+      },
+      { $unwind: { path: "$country", preserveNullAndEmptyArrays: true } },
+      {
+        $addFields: {
+          countryName: { $ifNull: ["$country.countryName", {}] },
+        },
+      },
+      {
+        $match: {
+          $or: [
+            { "uniName.en": { $regex: search, $options: "i" } },
+            { "uniName.ar": { $regex: search, $options: "i" } },
+            { "countryName.en": { $regex: search, $options: "i" } },
+            { "countryName.ar": { $regex: search, $options: "i" } },
+            { "uniOverview.en": { $regex: search, $options: "i" } },
+            { "uniOverview.ar": { $regex: search, $options: "i" } },
+          ],
+        },
+      },
+      {
+        $count: "total",
+      },
+    ];
 
-    // Get total count for pagination
-    const totalCount = universities.length;
+    // Main aggregation pipeline
+    const universityPipeline = [
+      // First join with countries to get country data
+      {
+        $lookup: {
+          from: "countries",
+          localField: "uniCountry",
+          foreignField: "_id",
+          as: "country",
+        },
+      },
+      { $unwind: { path: "$country", preserveNullAndEmptyArrays: true } },
+      {
+        $addFields: {
+          countryName: { $ifNull: ["$country.countryName", {}] },
+          countryFlag: { $ifNull: ["$country.countryPhotos.countryFlag", ""] },
+          countryCode: { $ifNull: ["$country.countryCode", ""] },
+        },
+      },
+      // Now we can search across all fields including country name
+      {
+        $match: {
+          $or: [
+            { "uniName.en": { $regex: search, $options: "i" } },
+            { "uniName.ar": { $regex: search, $options: "i" } },
+            { "countryName.en": { $regex: search, $options: "i" } },
+            { "countryName.ar": { $regex: search, $options: "i" } },
+            { "uniOverview.en": { $regex: search, $options: "i" } },
+            { "uniOverview.ar": { $regex: search, $options: "i" } },
+          ],
+        },
+      },
+      // Apply pagination after filtering
+      { $skip: (page - 1) * limit },
+      { $limit: limit },
+      // Join with courses
+      {
+        $lookup: {
+          from: "courses",
+          localField: "courseId",
+          foreignField: "_id",
+          as: "courseId",
+        },
+      },
+      { $project: selectedFields },
+    ];
 
-    // Process universities in batches for pagination
-    const paginatedUniversities = universities.slice(
-      (page - 1) * limit,
-      page * limit
-    );
+    // Execute both pipelines
+    const [totalCountResult, universityData] = await Promise.all([
+      universityModel.aggregate(countPipeline).exec(),
+      universityModel.aggregate(universityPipeline).exec(),
+    ]);
+
+    const totalCount =
+      totalCountResult.length > 0 ? totalCountResult[0].total : 0;
+
+    if (!universityData.length) {
+      return res.status(404).json({ message: "Universities not found" });
+    }
 
     // Extract all course IDs from the paginated universities
-    const allCourseIds = paginatedUniversities.flatMap(
-      (uni) => uni.courseId || []
+    const allCourseIds = universityData.flatMap(
+      (uni) => uni.courseId?.map((course) => course._id) || []
     );
 
     // Get language and mode of study data for all courses in one query
@@ -621,49 +708,6 @@ const getUniversitiesLimitedQuery = async (req, res) => {
         }
       });
     });
-
-    // Aggregation pipeline for fetching data with country information
-    const universityData = await universityModel.aggregate([
-      {
-        $match: {
-          $or: [
-            { "uniName.en": { $regex: search, $options: "i" } },
-            { "uniName.ar": { $regex: search, $options: "i" } },
-          ],
-        },
-      },
-      { $skip: (page - 1) * limit }, // Pagination: Skip documents
-      { $limit: limit }, // Pagination: Limit documents
-      {
-        $lookup: {
-          from: "countries",
-          localField: "uniCountry",
-          foreignField: "_id",
-          as: "country",
-        },
-      },
-      { $unwind: { path: "$country", preserveNullAndEmptyArrays: true } },
-      {
-        $addFields: {
-          countryName: { $ifNull: ["$country.countryName", {}] },
-          countryFlag: { $ifNull: ["$country.countryPhotos.countryFlag", ""] },
-          countryCode: { $ifNull: ["$country.countryCode", ""] },
-        },
-      },
-      {
-        $lookup: {
-          from: "courses",
-          localField: "courseId",
-          foreignField: "_id",
-          as: "courseId",
-        },
-      },
-      { $project: selectedFields }, // Dynamically select fields
-    ]);
-
-    if (!universityData.length) {
-      return res.status(404).json({ message: "Universities not found" });
-    }
 
     // Add spoken languages and study programs to each university
     const enrichedUniversityData = universityData.map((uni) => {
