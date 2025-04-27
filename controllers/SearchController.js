@@ -133,13 +133,7 @@ const getUniversitiesByCountries = async (req, res) => {
     const universityFilter = { uniCountry: { $in: countryIds } };
 
     // Only add filters if they have valid non-empty values
-    if (
-      req.query.StudyLevel &&
-      req.query.StudyLevel !== "All" &&
-      req.query.StudyLevel !== ""
-    ) {
-      universityFilter.studyLevel = { $in: [req.query.StudyLevel] };
-    }
+    // REMOVED studyLevel filter from here as it will be applied to majors
 
     if (req.query.EntranceExam && req.query.EntranceExam !== "") {
       universityFilter.entranceExamRequired = req.query.EntranceExam === "true";
@@ -158,11 +152,13 @@ const getUniversitiesByCountries = async (req, res) => {
     }
 
     // Check if we need major filtering - only consider non-empty values
+    // Added StudyLevel to the major filtering conditions
     const needsMajorFiltering =
+      (req.query.StudyLevel && req.query.StudyLevel !== "All" && req.query.StudyLevel !== "") ||
       (req.query.minBudget && req.query.minBudget !== "") ||
       (req.query.maxBudget && req.query.maxBudget !== "") ||
       (req.query.ModeOfStudy && req.query.ModeOfStudy !== "") ||
-      (req.query.MajorDuration && req.query.MajorDuration !== "") || // Changed from CourseDuration
+      (req.query.MajorDuration && req.query.MajorDuration !== "") ||
       (req.query.searchQuery && req.query.searchQuery !== "");
 
     // Pagination
@@ -247,6 +243,11 @@ const getUniversitiesByCountries = async (req, res) => {
     const universityIds = matchingUniversities.map((uni) => uni._id);
     majorMatchConditions.university = { $in: universityIds };
 
+    // Add StudyLevel filter to major conditions
+    if (req.query.StudyLevel && req.query.StudyLevel !== "All" && req.query.StudyLevel !== "") {
+      majorMatchConditions.studyLevel = req.query.StudyLevel;
+    }
+
     // Add budget filter if provided
     if (req.query.minBudget || req.query.maxBudget) {
       majorMatchConditions.majorTuitionFees = {}; // Changed from CourseFees
@@ -268,7 +269,6 @@ const getUniversitiesByCountries = async (req, res) => {
 
     // Handle major duration
     if (req.query.MajorDuration && req.query.MajorDuration !== "") {
-      // Changed from CourseDuration
       let [min, max] = req.query.MajorDuration.includes("+")
         ? [
             Number(req.query.MajorDuration.replace("+", "")),
@@ -280,16 +280,16 @@ const getUniversitiesByCountries = async (req, res) => {
 
       const durationConditions = [
         {
-          durationUnits: "Years", // Changed from CourseDurationUnits
-          duration: { $gte: min / 12, $lte: max / 12 }, // Changed from CourseDuration
+          durationUnits: "Years",
+          duration: { $gte: min / 12, $lte: max / 12 },
         },
         {
-          durationUnits: "Months", // Changed from CourseDurationUnits
-          duration: { $gte: min, $lte: max }, // Changed from CourseDuration
+          durationUnits: "Months",
+          duration: { $gte: min, $lte: max },
         },
         {
-          durationUnits: "Weeks", // Changed from CourseDurationUnits
-          duration: { $gte: min / 0.23, $lte: max / 0.23 }, // Changed from CourseDuration
+          durationUnits: "Weeks",
+          duration: { $gte: min / 0.23, $lte: max / 0.23 },
         },
       ];
 
@@ -299,7 +299,7 @@ const getUniversitiesByCountries = async (req, res) => {
     // Handle mode of study
     if (req.query.ModeOfStudy && req.query.ModeOfStudy !== "") {
       const modeOfStudyConditions = [
-        { modeOfStudy: { $in: [req.query.ModeOfStudy] } }, // Changed to match majorSchema
+        { modeOfStudy: { $in: [req.query.ModeOfStudy] } },
       ];
 
       andConditions.push({ $or: modeOfStudyConditions });
