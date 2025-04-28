@@ -13,7 +13,7 @@ const createUniversity = async (req, res) => {
     const { uniCountry, ...uniDetails } = req.body;
 
     // Create the university
-    const newUniversity = new universityModel(uniDetails);
+    const newUniversity = new universityModel({...uniDetails,  uniCountry});
     await newUniversity.save();
 
     await createNotification("University", newUniversity, "uniName", "created");
@@ -22,7 +22,7 @@ const createUniversity = async (req, res) => {
     if (uniCountry) {
       await countryModel.findByIdAndUpdate(
         uniCountry,
-        { $push: { universities: newUniversity._id } },
+        { $addToSet: { universities: newUniversity._id } }, // safer than $push to avoid duplicates
         { new: true }
       );
     }

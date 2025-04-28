@@ -78,7 +78,12 @@ const getCountries = async (req, res) => {
     }
 
     const query = parsedFilterProp.Destination?.length
-      ? { "countryName.en": { $in: parsedFilterProp.Destination } }
+      ? {
+          $or: [
+            { "countryName.en": { $in: parsedFilterProp.Destination } },
+            { "countryName.ar": { $in: parsedFilterProp.Destination } },
+          ],
+        }
       : {};
 
     const countries = await countryModel
@@ -120,7 +125,6 @@ const getUniversitiesByCountries = async (req, res) => {
     if (req.query.UniType && req.query.UniType !== "") {
       universityFilter.uniType = req.query.UniType;
     }
-
 
     // Check if we need major filtering
     const needsMajorFiltering =
@@ -515,7 +519,6 @@ const getMajorsByUniversities = async (req, res) => {
 
     // Add studyLevel filter to majors if provided
 
-
     // Add budget filter - handle string to number conversion
     if (req.query.minBudget || req.query.maxBudget) {
       const budgetConditions = [];
@@ -691,7 +694,6 @@ const getMajorsByUniversities = async (req, res) => {
       };
       additionalConditions.push(studyLevelCondition);
     }
-
 
     // Add mode of study filter
     if (req.query.ModeOfStudy && req.query.ModeOfStudy !== "") {
