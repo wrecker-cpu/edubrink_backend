@@ -507,10 +507,21 @@ const getMajorsByUniversities = async (req, res) => {
     // Clear cache for this request to ensure we get fresh results
     queryCache.del(cacheKey);
 
-    const universityIds = req.query.universityIds
-      ? req.query.universityIds.split(",")
-      : [];
+    const hasFilterProp = req.query.hasFilterProp === "true" ? true : false;
 
+    let universityIds = [];
+
+    // If filterProp is not passed, get all university IDs
+    if (hasFilterProp === false) {
+      // Get all university IDs from the database
+      const allUniversities = await universityModel.find().select("_id").lean();
+      universityIds = allUniversities.map((uni) => uni._id);
+    } else if (hasFilterProp === true) {
+      // Use the provided university IDs as before
+      universityIds = req.query.universityIds
+        ? req.query.universityIds.split(",")
+        : [];
+    }
     if (!universityIds.length)
       return res.status(400).json({ message: "No university IDs provided" });
 
@@ -534,7 +545,7 @@ const getMajorsByUniversities = async (req, res) => {
         });
       }
 
-      if (req.query.maxBudget && req.query.maxBudget !== "") {
+      if (req.query.maxBudget && req.query.maxBudget !== 10000) {
         budgetConditions.push({
           $expr: {
             $lte: [
